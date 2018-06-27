@@ -1,6 +1,10 @@
 # Starting
 
-Indexing fist the reference
+Indexing fist the reference. 
+
+Please define which reference you will use:
+
+a complete dataframe or a model from V9 region instead.
 
 ```bash
 srun bowtie2-build ./reference/euk_V9.unique.fa ./refence/euk_V9unique
@@ -31,9 +35,20 @@ And then sort its binary
 ```bash
 for i in A2 A3 A4 A5 A10
 do
-samtools sort bwt${i}.bam -o bwt${i}.bam.sorted
+samtools sort bwt${i}.bam -o bwt_${i}.bam.sorted
 done
 ```
+
+Let's index:
+
+```bash
+for i in A2 A3 A4 A5 A10
+do
+samtools index bwt_${i}.bam.sorted
+done
+```
+
+
 
 Let's use `cufflinks` to make coordinates from the samples:
 
