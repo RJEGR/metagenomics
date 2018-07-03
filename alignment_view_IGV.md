@@ -7,7 +7,7 @@ Please define which reference you will use:
 a complete dataframe or a model from V9 region instead.
 
 ```bash
-srun bowtie2-build ./reference/euk_V9.unique.fa ./refence/euk_V9unique
+bowtie2-build ./reference/euk_V9.unique.fa ./refence/euk_V9unique
 ```
 
 Then, lets align libs vs the indexed reference
@@ -15,17 +15,17 @@ Then, lets align libs vs the indexed reference
 ```bash
 for i in A2 A3 A4 A5 A10
 do
-srun bowtie2  -x ./reference/euk_V9.unique -q -1 04-X04-${i}-18S-AMB_*_L001_R1_001.fastq.gz -2 04-X04-${i}-18S-AMB_*_L001_R2_001.fastq.gz -S bwt_${i}.sam
+srun bowtie2  -x ./reference/eukarya-0p1 -q -1 04-X04-${i}-18S-AMB_*_L001_R1_001.fastq.gz -2 04-X04-${i}-18S-AMB_*_L001_R2_001.fastq.gz -S bwt_${i}.sam
 done 
 
 ```
 
 And compress into a binary format
 
-```BASH
+```bash
 for i in A2 A3 A4 A5 A10
 do
-samtools view -bS bwt${i}.sam > bwt${i}.bam 
+samtools view -bS bwt_${i}.sam > bwt_${i}.bam 
 done 
 
 ```
@@ -35,7 +35,7 @@ And then sort its binary
 ```bash
 for i in A2 A3 A4 A5 A10
 do
-samtools sort bwt${i}.bam -o bwt_${i}.bam.sorted
+samtools sort bwt_${i}.bam -o bwt_${i}.bam.sorted
 done
 ```
 
@@ -52,12 +52,23 @@ done
 
 Let's use `cufflinks` to make coordinates from the samples:
 
+> export PATH="$PATH:/home/rgomez/bin/cufflinks-2.2.1.Linux_x86_64/"
+
 ```bash
 for i in A2 A3 A4 A5 A10
 do
 cufflinks --overlap-radius 1 \
              --library-type fr-firststrand \
-             -o cufflinks.${i}.dir bwt_${i}.bam.sorted
+             -o cufflinks.${i}.dir bwt_${i}.bam.sorted.bai
+done
+```
+
+Rename the outfiles
+
+```bash
+for i in A2 A3 A4 A5 A10
+do
+mv cufflinks.${i}.dir/transcripts.gtf cufflinks.${i}.dir/${i}.gtf 
 done
 ```
 
@@ -65,11 +76,10 @@ done
 
 and then merge each transcripts.gtf into matrix using cuffmerge:
 
-> export PATH="$PATH:/home/rgomez/bin/cufflinks-2.2.1.Linux_x86_64/"
-
 ```bash
-ls cufflinks.A*/transcripts.gtf > cufflinks.txt
-cuffmerge -s reference/euk_V9.unique.fa cufflinks.txt
+
+ls cufflinks.A*/A*.gtf > cufflinks.txt
+cuffmerge -s reference/eukarya-0p1.fa cufflinks.txt
 
 ```
 
@@ -90,13 +100,10 @@ scp rgomez@omica:/LUSTRE/bioinformatica_data/genomica_funcional/mothur/bowtie/re
 
 
 # visualization in IGV:
-cufflinks.A10.dir
-Open > File > Load FILE > Select within CUFFLINKS directory to load
+Open > File > Load FILE > Select and load within CUFFLINKS directory :
 
-Referece than use to align reads (genome/transcriptome assembly)
-Merged *gtf file
-Merge independent each *gtf file from condition (ex.cufflinks.ds.dir/Sp_ds.transcripts.gtf)
-hits bam files from tophat (ex. Tophat.hs/hs_hits.bam)
-Use your reference
-
-/LUSTRE/bioinformatica_data/genomica_funcional/mothur/bowtie
+1. Referece than use to align reads (genome/transcriptome assembly)
+2. Merged *gtf file
+3. Merge independent each *gtf file from condition (ex.cufflinks.ds.dir/Sp_ds.transcripts.gtf)
+4. hits bam files from tophat (ex. Tophat.hs/hs_hits.bam)
+5. Use your reference
