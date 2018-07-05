@@ -1,6 +1,6 @@
 library(tidyverse)
 library(igraph)
-
+# http://pablobarbera.com/big-data-upf/html/02a-networks-intro-visualization.html
 
 dir <- "/Users/cigom/Desktop/STRING_Blanca/"
 setwd(dir)
