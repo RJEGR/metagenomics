@@ -64,11 +64,11 @@ png(filename = "violin.png",
     width = 12, height = 6, units = "in",
     res = 300)
 ggpubr::ggviolin(reshape::melt(n), 
-                x = "variable", 
-                y = "value", 
-                fill = "variable",
-                #yscale = "log2"
-                )
+                 x = "variable", 
+                 y = "value", 
+                 fill = "variable"
+                 #yscale = "log2"
+)
 dev.off()
 
 # label again some proteins
@@ -96,7 +96,7 @@ v$Contig <- NULL
 
 # homogenize the column y
 v$y <- paste(toupper(substring(v$y, 1,1)), substring(v$y, 2), sep="")
-
+library(igraph)
 # :: Make igraph object
 net <- graph_from_data_frame(d=links, vertices=v, directed=TRUE)
 
@@ -108,6 +108,7 @@ adj_mat<-as.matrix(get.adjacency(net))
 
 #
 pdf(file="Network_topology.pdf")
+
 plot(degree_distribution(net),
     #log="xy",
     col="sienna4",
