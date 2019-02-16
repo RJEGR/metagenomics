@@ -1,33 +1,55 @@
 #!/usr/bin/env Rscript
 
-# module load R-3.5.0
 # shared=$(ls MAKE_OTUS/*.shared)
 # taxonomy=$(ls MAKE_OTUS/*.cons.taxonomy)
-# Use: Rscript --vanilla lulu.R downstream/vsearch.lulu_in.list.txt $shared $taxonomy
+# Use: Rscript --vanilla lulu.R downstream/vsearch.match.list $shared $taxonomy
 # R version 3.5.0
 # Author: Ricardo Gomez-Reyes
 
 # ================
 # Defining paths
 # ================
-path <- getwd()
-# path <- '~/metagenomics/run13_18S/downstream/'
+path <- paste0(getwd(), "/downstream")
+system("mkdir -p downstream")
 
 # ===============
-# Loading package:
+# Check and load package:
 # ===============
 
-if (!require('devtools')) {
-  install.packages("devtools", dep=TRUE, repos='http://cran.us.r-project.org')
-} else   
-  if (!require('lulu')) {
-    devtools::install_github("tobiasgf/lulu")
-  }
+.git_packages <- c("lulu")
+.bioc_packages <- c("biomformat")
+
+.inst <- .git_packages %in% installed.packages()
+if(any(!.inst)) {
+  if (!require("devtools", quietly = TRUE))
+    install.packages("devtools", dep=TRUE, repos='http://cran.us.r-project.org')
+    devtools::install_github(git_packages[!.inst], ask = F)
+}
+
+
+.inst <- .bioc_packages %in% installed.packages()
+if(any(!.inst)) {
+  if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+  BiocManager::install(.bioc_packages[!.inst], ask = F)
+}
+
+# Load packages into session, and print package version
+sapply(c(.git_packages, .bioc_packages), require, character.only = TRUE)
+
+
+# # # # # #
+# parameters
+# # # # # # 
+
+min_r <- 1
+min_match <- 98
+min_cooccurence <- 0.95 
+
 
 # # # # # # # #
 # Loading data
 # # # # # # # #
-
 
 args = commandArgs(trailingOnly=TRUE)
 
@@ -35,17 +57,27 @@ vsearch.file = args[1]
 shared.file = args[2]
 taxonomy.file = args[3]
 
-if (is.na(args[4])) {
-  Rank <- c("Reino", "Filo", "Clase", "Orden", "Familia", "Especie")
-} else
-  Rank <- c(args[4])
 
+# # # # # # # # # # # # # # # #
+# define prefix for save resuls:
+# # # # # # # # # # # # # # # #
 
+out.prefix <- strsplit(shared.file, "[.]")
+shared.out.prefix <- do.call(paste, 
+                             c(as.list(out.prefix[[1]][-length(out.prefix[[1]])]), 
+                               sep = '.',collapse = ''))
+
+out.prefix <- NULL
+
+out.prefix <- strsplit(taxonomy.file, "[.]")
+tax.out.prefix <- do.call(paste, 
+                             c(as.list(out.prefix[[1]][-length(out.prefix[[1]])]), 
+                               sep = '.',collapse = ''))
 # # # # # # # #
 # Running lulu
 # # # # # # # #
 
-#  Match list (used vsearch for all OTUs (Representative seq) with 0.03 % similitud)
+#  Match list (vsearch used for all OTUs (Representative seq) with 0.03 % similitud)
 matchlist <- read.table(vsearch.file , header=FALSE, as.is=TRUE, stringsAsFactors=FALSE)
 
 shared <- read.csv(shared.file, sep="\t", header=TRUE, stringsAsFactors=FALSE)
@@ -57,37 +89,51 @@ otutab <- as.data.frame(t(otutab))
 # # # # # # # # # # # 
 
 curated_result <- lulu(otutab, matchlist, minimum_ratio_type = "min", 
-                       minimum_ratio = 1, 
-                       minimum_match = 98, 
-                       minimum_relative_cooccurence = 0.95)
+                       minimum_ratio = min_r, 
+                       minimum_match = min_match, 
+                       minimum_relative_cooccurence = min_cooccurence)
 
+# # # # # # # # # # #
+# Set results to save
+# # # # # # # # # # #
 
-# 
-# otu_map <- read.csv(paste0(path, "/lulu_otu_map", ".csv"), sep = ' ')
-# curated_table <- read.csv(paste0(path,"/lulu_curated_table", ".csv"), sep = ' ')
+# Save the curated_result object to a file
+saveRDS(curated_result, "curated_result.rds")
 
-library(dplyr)
+# Restore it later
+# curated_result <- readRDS("curated_result.rds")
 
-parent <- filter(otu_map, curated == "parent")
-filtered <- data.frame(otutab[rownames(otutab) %in% parent$parent_id, ])
-merged <- data.frame(otutab[!rownames(otutab) %in% parent$parent_id, ])
+otu_map <- curated_result$otu_map
+parent <- otu_map[otu_map$curated == "parent",]
+
+cat("\n...Number of Processed OTUs are:", length(otu_map$curated), "\n")
+cat("Curated in ~real biological OTUs (parents):",table(otu_map$curated)[2], "\n")
+cat("And", table(otu_map$curated)[1], "daughters (merged) OTUs\n")
+
+curated_table <- curated_result$curated_table
+names(curated_table) <- shared$Group
 
 # # # # # # # # # # # # # #
 # recorte de taxonomy file
 # # # # # # # # # # # # # #
 
-# taxonomy.file = 'cigom.trim.contigs.good.unique.pick.good.filter.unique.precluster.pick.opti_mcc.unique_list.0.03.cons.taxonomy'
-
 taxonomy.obj <- read.csv(taxonomy.file, sep="\t", header=TRUE, stringsAsFactors=FALSE)
 taxonomy <- data.frame(taxonomy.obj[taxonomy.obj$OTU %in% parent$parent_id, ])
 
 tax <- strsplit(taxonomy[,ncol(taxonomy)], ";")
-tax <- sapply(tax, "[", c(1:length(Rank))) # solo se toman los niveles de Rank pero se puede tomar el resto
+max.rank <- max(lengths(tax))
+tax <- sapply(tax, "[", c(1:max.rank)) # Using the max rank assignation to names the taxonomy object
 tax <- as.data.frame(t(tax))
 tax <- as.data.frame(apply(tax, 2, function(x) gsub("\\(.*$", "",  x, perl=TRUE)), stringsAsFactors = F)
 
 
-colnames(tax) <- Rank
+rank.names <- vector(max.rank, mode="character")
+
+for (i in 1:max.rank) {
+  rank.names[i] <- paste("Rank", i, sep="_")
+}
+
+colnames(tax) <- rank.names
 rownames(tax) <- taxonomy[,1]
 
 # # # # # # # # # # # # 
@@ -102,47 +148,62 @@ cat("\n.... Taxonomy and count table has been curated:",testing, "\n")
 # # # # # # # #
 
 # 1.
-
-otu_map <- curated_result$otu_map
 write.table(otu_map, 
-            file = paste0(path, "/downstream/lulu_otu_map", ".csv"),
+            file = paste0(path, "/", "lulu", "_",
+                          "cooccurence_", min_cooccurence, "_",
+                          "min_match_", min_match, "_",
+                          "min_ratio_", min_r, "_",
+                          "otu_map.csv"),
             sep = " ", quote = FALSE)
 
 # 2.
-
-curated_table <- curated_result$curated_table
-write.table(curated_table, file = paste0(path,"/downstream/lulu_list.shared", ".csv"),
-            sep = " ", quote = FALSE)
+write.table(curated_table, file = paste0(path,"/" ,shared.out.prefix, ".lulu", ".shared"),
+            sep = "\t", quote = FALSE)
 # 3.
-
 tax.out <- data.frame(OTU = taxonomy[,1],
                       Size = taxonomy[,2], 
                       Taxonomy = tidyr::unite(tax, sep = ";")[,1])
 
-write.table(tax.out, file = paste0(path,"/downstream/lulu_cons.taxonomy"),
+# 3.1
+write.table(tax.out, file = paste0(path, "/", tax.out.prefix, ".lulu", ".taxonomy"),
             sep = "\t", quote = FALSE,
             row.names = FALSE)
+
+# 4
+write.table(parent$parent_id, 
+            file = paste0(path, "/", "lulu", "_",
+                          "cooccurence_", min_cooccurence, "_",
+                          "min_match_", min_match, "_",
+                          "min_ratio_", min_r, "_",
+                          "parent.accnoss"),
+            quote = FALSE, 
+            col.names = FALSE, 
+            row.names = FALSE)
+
+
+
 
 # # # # # # # # # 
 # Bio integration
 # # # # # # # # # 
 
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-BiocManager::install("biomformat", version = "3.8")
+biom.out <- make_biom(curated_table, 
+               observation_metadata = taxonomy,
+               sample_metadata = NULL,
+               matrix_element_type = "int")
 
-library(biomformat)
-
-make_biom()
-
-#MAKE_OTUS/*.cons.taxonomy # este es el original
-#downstream/*.cons.taxonomy # el archivo es el mismo , pero contiene el Size del numero de la secuencia representativa
-
-
-
-
+write_biom(biom.out, paste0(path, "/", "lulu", "_",
+                            "cooccurence_", min_cooccurence, "_",
+                            "min_match_", min_match, "_",
+                            "min_ratio_", min_r,
+                            ".biom"))
 
 quit(save = 'no')
+
+# INCLUIR EN EL RMD ambos archivos (lulu_cons.taxonomy y lulu_curated_table.csv), 
+
+taxonomy2 = observation_metadata(biom.out)
+data = as(biom_data(biom.out), "matrix")
 
 # =============
 
@@ -152,50 +213,11 @@ Ph <- as.data.frame(table(tax[,2]))
 
 
 
-```{r LULU}
+```{r}
 library(lulu)
 
-# Loading match list (used vsearch for all OTUs (Representative seq) with 0.03 % similitud)
-
-# downstream <- paste0(path, "/downstream")
-vsearch.file <- paste0(path,"/downstream", "/vsearch.lulu_in.list.txt")
-matchlist <- read.table(vsearch.file , header=FALSE, as.is=TRUE, stringsAsFactors=FALSE)
-
-otutab <- as.data.frame(otu_table(phyloseq), header=TRUE, stringsAsFactors=FALSE)
-# otutab <- as.data.frame(t(otutab))
-
-#names <- strsplit(names(shared), "_")
-#names <- sapply(names, "[", c(3))
-#names(shared) <- names
-
-curated_result <- lulu(otutab, matchlist, minimum_ratio_type = "min", 
-                       minimum_ratio = 1, 
-                       minimum_match = 98, 
-                       minimum_relative_cooccurence = 0.95)
-
-# And update phylose object
-
-otu_map <- curated_result$otu_map
-
-write.table(otu_map, 
-            file = paste0(path, "/lulu_otu_map", ".csv"),
-            sep = " ", quote = FALSE)
-
-
-table(otu_map$curated)
-# merged parent (run13_18S)
-#  4221  22101
-
-
-# 
-# :::::: also save the newer table
-
-curated_table <- curated_result$curated_table
-
-write.table(curated_table, file = paste0(path,"/downstream/lulu_curated_table", ".csv"),
-            sep = " ", quote = FALSE)
-
-# 
+filtered <- data.frame(otutab[rownames(otutab) %in% parent$parent_id, ])
+merged <- data.frame(otutab[!rownames(otutab) %in% parent$parent_id, ])
 
 # compare diversity from both, filtered and raw- count table
 # A simple β-diversity measure (average α-diversity divided by γ-diversity) was applied to all uncurated and LULU curated tables (
