@@ -8,12 +8,14 @@
 # Los campos de la asignación taxonómica vacíos son rellenados con valores NA, y finalmente se retienen sólo los taxones con resolución hasta especie. 
 
 # How tu run:
+# bold_Plants_Chlorophyta.trim, bold_Plants_Magnoliophyta.trim, bold_Plants_Bryophyta.trim
 # ~$ kingdom='Plants'
 # ~$ cut -f1,3,5,7,9,13,15,17 *${kingdom}*trim | sed 's/ /_/g' > taxonomy.${kingdom}.csv 
 # Rscript --vanilla bold_public_process_for_RDP.R taxonomy.${kingdom}.csv
 args = commandArgs(trailingOnly=TRUE)
 
-cat('1. Reading file ... \n')
+cat('1. Reading file at time:', (d <- format(Sys.time(), "%H:%M:%S")), '\n')
+
 
 file = args[1]
 kingdom <- strsplit(file, '[.]')[[1]][2]
@@ -69,4 +71,8 @@ write(fasta,
 
 cat('7. DONE!\n')
 
+difftime(strptime(format(Sys.time(), "%H:%M:%S"), format = "%H:%M:%S"), 
+         strptime(d, format = "%H:%M:%S"),units="auto")
+
 quit(save ='no')
+
