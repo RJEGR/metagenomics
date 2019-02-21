@@ -1,18 +1,10 @@
 #!/usr/bin/env Rscript
-# Rscript tax.summary.R file.cons.taxonomy
+# Rscript tax.stats.R file.cons.taxonomy
 
 args = commandArgs(trailingOnly=TRUE)
-file = args[1]
+taxonomy.file = args[1]
 
-taxonomy <- read.csv(file, header=FALSE, sep="\t", stringsAsFactors=FALSE)
-
-tag <- strsplit(file, "[.]")[[1]][1]
-
-
-if (is.na(args[2])) {
-  Rank <- c("Reino", "Filo", "Clase", "Orden", "Familia", "Especie")
-} else
-  Rank <- c(args[2])
+tag <- strsplit(taxonomy.file, "[.]")[[1]][1]
 
 # ==============
 ## Checking and Load packages ----
@@ -27,111 +19,142 @@ if(any(!.inst)) {
 # Load packages into session, and print package version
 sapply(c(.cran_packages), require, character.only = TRUE)
 
-cat("\n.... Ploting!\n")
+cat("\n 1. Processing taxonomy... \n")
+
+taxonomy.obj <- read.csv(taxonomy.file, header=FALSE, sep="\t", stringsAsFactors=FALSE)
+
+tax.split <- strsplit(taxonomy.obj[, ncol(taxonomy.obj)], ";")
+max.rank <- max(lengths(tax.split)) # La funcion lengths esta en R v.3.5
+taxonomy <- sapply(tax.split, "[", c(1:max.rank)) # Using the max rank assignation to names the taxonomy object
+taxonomy <- as.data.frame(t(taxonomy))
+tax <- as.data.frame(apply(taxonomy, 2, function(x) gsub("\\(.*$", "",  x, perl=TRUE)), stringsAsFactors = F)
 
 
-# x <- read.csv("run012_astr_ASVs.50_COI.wang.taxonomy", header=FALSE, sep="\t", stringsAsFactors=FALSE)
-# Ranks <- c("Filo", "Clase", "Orden", "Especie") # BOLD Ranks
-# file = "run012_astr_ASVs.50_COI.wang.taxonomy"
-# x <- read.csv("run012_astr_ASVs.midori.taxonomy", header=FALSE, sep="\t", stringsAsFactors=FALSE)
-# Ranks <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus")
+rank.names <- vector(max.rank, mode="character")
 
-#x <- read.csv("run012_astr_ASVs.IctiosConsenso.wang.tax.summary", header=FALSE, sep="\t", stringsAsFactors=FALSE)
-# Ranks <- c("Orden", "Familia", "Especie") # SANGER
+for (i in 1:max.rank) {
+  rank.names[i] <- paste("Rank", i, sep="_")
+}
 
-tax <- strsplit(taxonomy[,ncol(taxonomy)], ";")
-#tax <- sapply(tax, "[", c(1:length(Ranks)+1))
-tax <- sapply(tax, "[", c(1:length(Rank)))
-tax <- as.data.frame(t(tax))
-head(tax)
+colnames(tax) <- rank.names
+rownames(tax) <- taxonomy.obj[,1]
+
+# cat("\n.... Ploting!\n")
+#Ph <- as.data.frame(table(T[,2]))
+#spp <- as.data.frame(table(T[,length(Rank)]))
 
 
-T <- as.data.frame(apply(tax, 2, 
-    function(x) gsub("\\(.*$", "",  x, perl=TRUE)),
-     stringsAsFactors = F)
+cat("\n 2. Bootstrap stats ... \n")
 
-#T <- T[,-c(1)] # For remove midori root Rank
-colnames(T) <- Rank
-rownames(T) <- taxonomy[,1]
+boots <- as.data.frame(apply(taxonomy, 2, function(x) gsub("[A-z||()]", "",  x, perl=TRUE)), stringsAsFactors = F)
+boots <- apply(boots, 2, as.numeric)
+boots <- data.frame(boots)
 
-barplot(table(T[,2]), horiz = TRUE, las=2)
+boots[is.na(boots)] <- 0
 
-Ph <- as.data.frame(table(T[,2]))
-spp <- as.data.frame(table(T[,length(Rank)]))
+colnames(boots) <- rank.names   
+rownames(boots) <- taxonomy.obj[,1]
 
+# Recorte de algun rank con asignacion root;
+boots <- boots[apply(boots, 2, mean) != 100]
+tax <- tax[names(tax) %in% names(boots)]
 
-# boostrap
-B <- as.data.frame(apply(tax, 2, 
-    function(x) gsub("[A-z||()]", "",  x, perl=TRUE)),
-     stringsAsFactors = F)
+tax.rank <- 2 # Possition rank in data.frame
 
-B <- apply(B, 2, as.numeric)
-B <- data.frame(B)
-# B <- B[,-c(1)]
-colnames(B) <- Rank   
-rownames(B) <- taxonomy[,1]
+rank.stat <- data.frame(rank = tax[,tax.rank], Boots = boots[,tax.rank])
 
-boots <- reshape2::melt(B) #, id.vars=colnames(B), variable.name = "Process", value.name = "Bootstrap")
+# # # Testing
+ggplot(rank.stat, aes(Boots, ..count.., colour=rank, fill=rank)) +
+    geom_histogram(alpha=0.35, position = "stack", bins = 100) +
+    scale_fill_brewer(palette = "Paired" ) +
+    scale_color_brewer(palette ="Paired" ) +
+    facet_wrap(~ rank, scales="free_y") + theme_minimal()  
+# # # 
+
+boots.stat <- aggregate(rank.stat[,2], by=list(rank.stat[,1]), 
+                    FUN = function(x) c(mean = mean(x), 
+                                        median = median(x),
+                                        sd =sd(x),
+                                        ntaxa = length(x),
+                                        mintax = min(x),
+                                        maxtax = max(x) ))
+                                        #quantile(x, probs = c(0.1, 0.25, 0.75, 1)) ) )
+
+boots.stat <- data.frame(Rank = boots.stat[,1], boots.stat[,2])
+
+cat("\n 3. Writing results ... \n")
+
+# 1.
+write.table(tax,
+            file = paste0(tag, ".taxonomy"), 
+            sep=" ",
+            append = FALSE, quote = FALSE,
+            row.names = TRUE, 
+            col.names = TRUE
+                   )
+
+# 2.
+
+ write.table(boots.stat,
+            file = paste0(tag,".PROBS.taxonomy.stats"), 
+            sep=" ", 
+            append = FALSE, quote = FALSE,
+            row.names = FALSE, 
+            col.names = TRUE
+                   )
+
+# 3.                  
+
+ write.table(boots,
+            file = paste0(tag,".PROBS.taxonomy"), 
+            sep=" ", 
+            append = FALSE, quote = FALSE,
+            row.names = TRUE, 
+            col.names = TRUE
+                   )
+
+cat('\n Done! \n')
+
+quit(save='no')
+
+# input fasta better to further analysis and, 
+# calculate nbases seq from results and plot as follow:
+
+nbases <- read.csv('run012_relax_ASVs.summary', header=TRUE, sep="\t", stringsAsFactors=FALSE)
+
+nbases <- nbases['nbases']
+
+id.vars=colnames(B), variable.name = "Process", value.name = "Bootstrap")
 colnames(boots) <- c("Nivel", "Bootstrap")
 
 
-a <- ggplot(boots, aes(x = Bootstrap))
-a <- a +  geom_density(aes(fill = Nivel, y = ..count..), alpha = 0.4) + 
+plot <- data.frame(nbases = nbases, boots)
+plot.melt <- melt(plot, id.vars='nbases', 
+                        value.name = 'Bootstrap',
+                        variable.name = "Rank")
+# queda bien, pero hace falta describir que esta indicando
+p <- ggplot(plot.melt, aes(x=nbases, y=Bootstrap, color=Rank, group = Rank ))
+p +
+  geom_point(alpha = 0.4) +
+  scale_color_brewer(palette = "Dark2") +
+  facet_wrap(~Rank) +
+  theme_minimal()
+
+
+a <- ggplot(datavis, aes(ntaxa)) +
+    geom_density(aes(fill = Rank, y = ..count..), alpha = 0.4) + 
                             scale_fill_brewer(palette = "Dark2") +
                             #scale_color_brewer(palette = "Dark2") +
                             facet_wrap(~Nivel) + 
                             theme_minimal()
 
-
-write.table(T,
-            file=paste0(tag, ".taxonomy"), 
-            sep="\t", 
-            row.names = TRUE, 
-            col.names = TRUE
-                   )
-
- write.table(B,
-            file=paste0(tag,".PROBS.taxonomy"), 
-            sep="\t", 
-            row.names = TRUE, 
-            col.names = TRUE
-                   )
+ggplot(datavis, aes(x=Rank, y=ntaxa, fill=Rank)) + 
+  geom_bar(stat="identity", color="black", 
+           position=position_dodge()) +
+  geom_errorbar(aes(ymin=ntaxa, ymax=ntaxa+sd), width=.2,
+                 position=position_dodge(.9))
 
 
-# Dimentionally of ASVs bootstrap
-
-quit(save = 'no')
-
-pca <- prcomp(t(B), scale=TRUE)
-pca <- prcomp(B, scale=TRUE)
-
-## make a scree plot
-pca.var <- pca$sdev^2
-pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
- 
-barplot(pca.var.per, main="Scree Plot", xlab="Principal Component", ylab="Percent Variation")
- 
-
-pca.data <- data.frame(Sample=rownames(pca$x), X=pca$x[,1], Y=pca$x[,2], Filo=T$Filo, Bootstrap=B$Especie)
-
-#T$Sample <- rownames(T)
-#T %>%
-#    group_by(Sample) %>%
-#    inner_join(pca.data, by = "Sample") -> pca.data.plot
-
-ggplot(data=pca.data, aes(x=X, y=Y, size=Bootstrap, color=Filo)) +
-  geom_point() +
-  scale_color_brewer(palette = "Dark2") +
-  #geom_text() +
-  xlab(paste("PC1 - ", pca.var.per[1], "%", sep="")) +
-  ylab(paste("PC2 - ", pca.var.per[2], "%", sep="")) +
-  theme_minimal() +
-  ggtitle("Bootstrap de Nivels Taxonomicos - PCA")
-
-
-## ====
-
-quit(save='no')
 
 count <- read.csv("../../run012_astr_ASVs_count.table", sep="\t")
 ict <- count[,c(54,55)]
