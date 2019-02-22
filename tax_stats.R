@@ -3,7 +3,7 @@
 # How to run:
 # Rscript tax.stats.R file.taxonomy file.fasta
 
-#<!-- El siguiente script toma con información de entrada la taxonomía asignada con el módulo rdp de mothur classify.seqs(fasta, taxonomy, cutoff, probs=T), y procesa la taxonomía en dos tablas, (1) los valores de confiabilidad (bootstrap) a lo largo de las secuencias de amplicones y (2) las asignaciones taxonómicas a lo largo de las secuencias de amplicones. El script no considera la base de referencia con la que los amplicones fueron clasificados y determina los niveles taxonómicos con la nomenclatura (Rank_1 …. Rank N). Finalmente, dos visualizaciones presentan la distribución de la confiabilidad en base a los grupos taxonómicos identificados y el tamaño del amplicón. -->
+#<!-- El siguiente script toma con archivos de entrada la taxonomía asignada con el módulo rdp de mothur classify.seqs(fasta, taxonomy, cutoff, probs=T), y procesa la taxonomía en dos tablas, (1) los valores de confiabilidad (bootstrap) a lo largo de las asignaciones hechas a las secuencias de amplicones y (2) las asignaciones taxonómicas correspondientes. El script no considera ninguna entidad taxonómica (ej. Bergey’s Taxonomic Outlines) e implementa la etiqueta Rank (ej. Rank_1, Rank_2. Rank_N) para referirse al nivel del las asignaciones. Finalmente, dos visualizaciones presentan la distribución de la confiabilidad en base a los grupos taxonómicos identificados y el tamaño del amplicón. -->
 
 args = commandArgs(trailingOnly=TRUE)
 
@@ -64,17 +64,22 @@ cat("\n 2. Bootstrap stats ... \n")
 boots <- as.data.frame(apply(taxonomy, 2, function(x) gsub("[A-z||()]", "",  x, perl=TRUE)), stringsAsFactors = F)
 boots <- apply(boots, 2, as.numeric)
 boots <- data.frame(boots)
-
 boots[is.na(boots)] <- 0
 
 colnames(boots) <- rank.names   
 rownames(boots) <- taxonomy.obj[,1]
 
+boots.backup <- boots
+
 # Recorte de algun rank con asignacion root;
 boots <- boots[apply(boots, 2, mean) != 100]
-tax <- tax[names(tax) %in% names(boots)]
+boots <- boots[apply(boots, 2, max) <= 100]
+boots <- boots[apply(boots, 2, min) > 0]
 
-tax.rank <- 2 # Possition rank in data.frame
+tax <- tax[names(tax) %in% names(boots)]
+tax <- tax[rownames(tax) %in% rownames(boots),]
+
+tax.rank <- 1 # Possition rank in data.frame
 
 rank.stat <- data.frame(rank = tax[,tax.rank], Boots = boots[,tax.rank])
 
