@@ -1,8 +1,14 @@
 #!/usr/bin/env Rscript
-# Rscript tax.stats.R file.cons.taxonomy
+
+# How to run:
+# Rscript tax.stats.R file.taxonomy file.fasta
+
+#<!-- El siguiente script toma con información de entrada la taxonomía asignada con el módulo rdp de mothur classify.seqs(fasta, taxonomy, cutoff, probs=T), y procesa la taxonomía en dos tablas, (1) los valores de confiabilidad (bootstrap) a lo largo de las secuencias de amplicones y (2) las asignaciones taxonómicas a lo largo de las secuencias de amplicones. El script no considera la base de referencia con la que los amplicones fueron clasificados y determina los niveles taxonómicos con la nomenclatura (Rank_1 …. Rank N). Finalmente, dos visualizaciones presentan la distribución de la confiabilidad en base a los grupos taxonómicos identificados y el tamaño del amplicón. -->
 
 args = commandArgs(trailingOnly=TRUE)
+
 taxonomy.file = args[1]
+fasta.file <- args[2] # input fasta to calculate nbases seq and plot vs bootstrap
 
 tag <- strsplit(taxonomy.file, "[.]")[[1]][1]
 
@@ -10,14 +16,23 @@ tag <- strsplit(taxonomy.file, "[.]")[[1]][1]
 ## Checking and Load packages ----
 # ==============
 
-.cran_packages <- c('dplyr', 'purrr', 'tibble', 'reshape2', 'ggplot2')
+.cran_packages <- c('dplyr', 'purrr', 'tibble', 'reshape2', 'ggplot2', 'RColorBrewer')
+.bioc_packages <- c("Biostrings", "IRanges")
 
+# 1.
 .inst <- .cran_packages %in% installed.packages()
 if(any(!.inst)) {
    install.packages(.cran_packages[!.inst], dep=TRUE, repos='http://cran.us.r-project.org')
 }
+# 2.
+.inst <- .bioc_packages %in% installed.packages()
+if(any(!.inst)) {
+    if (!requireNamespace("BiocManager", quietly = TRUE))
+        install.packages("BiocManager")
+    BiocManager::install(.bioc_packages[!.inst], ask = F)
+}
 # Load packages into session, and print package version
-sapply(c(.cran_packages), require, character.only = TRUE)
+sapply(c(.cran_packages, .bioc_packages), require, character.only = TRUE)
 
 cat("\n 1. Processing taxonomy... \n")
 
@@ -63,14 +78,6 @@ tax.rank <- 2 # Possition rank in data.frame
 
 rank.stat <- data.frame(rank = tax[,tax.rank], Boots = boots[,tax.rank])
 
-# # # Testing
-ggplot(rank.stat, aes(Boots, ..count.., colour=rank, fill=rank)) +
-    geom_histogram(alpha=0.35, position = "stack", bins = 100) +
-    scale_fill_brewer(palette = "Paired" ) +
-    scale_color_brewer(palette ="Paired" ) +
-    facet_wrap(~ rank, scales="free_y") + theme_minimal()  
-# # # 
-
 boots.stat <- aggregate(rank.stat[,2], by=list(rank.stat[,1]), 
                     FUN = function(x) c(mean = mean(x), 
                                         median = median(x),
@@ -98,7 +105,7 @@ write.table(tax,
  write.table(boots.stat,
             file = paste0(tag,".PROBS.taxonomy.stats"), 
             sep=" ", 
-            append = FALSE, quote = FALSE,
+            append = FALSE, quote = TRUE,
             row.names = FALSE, 
             col.names = TRUE
                    )
@@ -113,85 +120,47 @@ write.table(tax,
             col.names = TRUE
                    )
 
+cat('\n Visualizing some data\n')
+
+
+seqs <- readDNAStringSet(fasta.file)
+seqs.width <- width(seqs)
+
+plot <- data.frame(nbases = seqs.width, boots)
+plot.melt <- melt(plot, id.vars='nbases', 
+                        value.name = 'boots',
+                        variable.name = "Rank")
+
+plot.melt$Asignación <- ifelse(plot.melt$boots >= 90, 'Confiable', 'Poco confiable')
+
+# 1.
+p <- ggplot(plot.melt, aes(x=nbases, y=boots, color=Rank, group = Rank ))
+p +
+  geom_point(alpha = 0.4, aes(shape = Asignación)) +
+  scale_color_brewer(palette = "Dark2") +
+  facet_wrap(~Rank) +
+  theme_minimal() +
+  labs(title = "Confiabilidad de las asignaciones taxonómicas",
+       subtitle = "La confiabilidad a lo largo de la profundidad taxonómica es mostrada en los paneles",
+       caption = "Se considera el tamaño del amplicón para determinar el efecto dentro de la asignación", 
+       x = "Tamaño del amplicón", y = "% Bootstrap") +
+  guides(color = FALSE)
+
+# 2.
+colourCount = nrow(boots.stat)
+getPalette = colorRampPalette(brewer.pal(12, "Paired"))
+
+p <- NULL
+p <- ggplot(boots.stat, aes(x=sd, y=mean, color=Rank, size = ntaxa ))
+p + geom_point() +
+scale_color_manual(values = c(getPalette(colourCount)), na.value = "grey", guide = guide_legend(ncol=1)) +
+  theme_minimal() +
+  labs(title = "Grupos taxonómicos asignados",
+       subtitle = "Proporción de asignaciones taxonómicas",
+       caption = "La media y desviación estándar (sd) son calculadas para cada grupo taxonómico", 
+       x = "% Bootstrap (sd)", y = "% Bootstrap (mean)")
+
 cat('\n Done! \n')
 
 quit(save='no')
 
-# input fasta better to further analysis and, 
-# calculate nbases seq from results and plot as follow:
-
-nbases <- read.csv('run012_relax_ASVs.summary', header=TRUE, sep="\t", stringsAsFactors=FALSE)
-
-nbases <- nbases['nbases']
-
-id.vars=colnames(B), variable.name = "Process", value.name = "Bootstrap")
-colnames(boots) <- c("Nivel", "Bootstrap")
-
-
-plot <- data.frame(nbases = nbases, boots)
-plot.melt <- melt(plot, id.vars='nbases', 
-                        value.name = 'Bootstrap',
-                        variable.name = "Rank")
-# queda bien, pero hace falta describir que esta indicando
-p <- ggplot(plot.melt, aes(x=nbases, y=Bootstrap, color=Rank, group = Rank ))
-p +
-  geom_point(alpha = 0.4) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap(~Rank) +
-  theme_minimal()
-
-
-a <- ggplot(datavis, aes(ntaxa)) +
-    geom_density(aes(fill = Rank, y = ..count..), alpha = 0.4) + 
-                            scale_fill_brewer(palette = "Dark2") +
-                            #scale_color_brewer(palette = "Dark2") +
-                            facet_wrap(~Nivel) + 
-                            theme_minimal()
-
-ggplot(datavis, aes(x=Rank, y=ntaxa, fill=Rank)) + 
-  geom_bar(stat="identity", color="black", 
-           position=position_dodge()) +
-  geom_errorbar(aes(ymin=ntaxa, ymax=ntaxa+sd), width=.2,
-                 position=position_dodge(.9))
-
-
-
-count <- read.csv("../../run012_astr_ASVs_count.table", sep="\t")
-ict <- count[,c(54,55)]
-
-sanger <- data.frame(B, Average=rowSums(B)/ncol(B), BestID=T$Especie, ict, stringsAsFactors=FALSE)
-
-ftest <- sanger[sanger$X04.P68.ICT != 0,] # en funcion de la P114 / P68 hacemos el segundo cutoff
-# ftest <- ftest[ftest$Average >=50,] # quitamos malas asignaciones
-
-
-#aggreg <- aggregate(ftest, list(ftestBestID), sum)
-
-
-predicted <- as.data.frame(table(ftest$BestID))[,2]
-obs <- rep(1, length(predicted))
-
-
-library(caret) 
-xtab <- table(predicted, obs)
-confusionMatrix(xtab) # tiene que ser matriz de factores ,no numerica
-
-
-aggregate(ftest$X04.P68.ICT, by=list(ftest$BestID), FUN=sum)
-
-
-# ==============
-# Outputs config
-# ==============
-
-label <- strsplit(list.files(data_path)[1], "-")[[1]]
-date <- format(Sys.time(), "%Y%m%d")
-out_prefix <- paste0("run",label[1], n_test) # Output prefix (for plots and files)
-run <- paste0("run", label[1], "_", date,"_COI")
-
-# ================
-# Outputs in `pwd`:
-# ================
-dir = getwd()
-out_path <- file.path(dir, "dada2_asv", run)
-system(command = paste0("mkdir -p ", out_path), intern = F)
