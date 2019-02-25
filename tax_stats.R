@@ -42,6 +42,7 @@ tax.split <- strsplit(taxonomy.obj[, ncol(taxonomy.obj)], ";")
 max.rank <- max(lengths(tax.split)) # La funcion lengths esta en R v.3.5
 taxonomy <- sapply(tax.split, "[", c(1:max.rank)) # Using the max rank assignation to names the taxonomy object
 taxonomy <- as.data.frame(t(taxonomy))
+rownames(taxonomy) <- taxonomy.obj[,1]
 tax <- as.data.frame(apply(taxonomy, 2, function(x) gsub("\\(.*$", "",  x, perl=TRUE)), stringsAsFactors = F)
 
 
@@ -73,17 +74,17 @@ boots.backup <- boots
 
 # Recorte de algun rank con asignacion root;
 boots <- boots[apply(boots, 2, mean) != 100]
-boots <- boots[apply(boots, 2, max) <= 100]
-boots <- boots[apply(boots, 2, min) > 0]
+boots <- boots[apply(boots, 1, max) <= 100,] #remove rows redundant bootstrap
+boots <- boots[apply(boots, 1, min) > 0,] # ""
 
 tax <- tax[names(tax) %in% names(boots)]
 tax <- tax[rownames(tax) %in% rownames(boots),]
 
 tax.rank <- 1 # Possition rank in data.frame
 
-rank.stat <- data.frame(rank = tax[,tax.rank], Boots = boots[,tax.rank])
+rank.stat <- data.frame(lineage = tax[,tax.rank], Boots = boots[,tax.rank])
 
-boots.stat <- aggregate(rank.stat[,2], by=list(rank.stat[,1]), 
+lineage.stats <- aggregate(rank.stat[,2], by=list(rank.stat[,1]), 
                     FUN = function(x) c(mean = mean(x), 
                                         median = median(x),
                                         sd =sd(x),
@@ -92,7 +93,7 @@ boots.stat <- aggregate(rank.stat[,2], by=list(rank.stat[,1]),
                                         maxtax = max(x) ))
                                         #quantile(x, probs = c(0.1, 0.25, 0.75, 1)) ) )
 
-boots.stat <- data.frame(Rank = boots.stat[,1], boots.stat[,2])
+lineage.stats <- data.frame(lineage = lineage.stats[,1], lineage.stats[,2])
 
 cat("\n 3. Writing results ... \n")
 
@@ -107,7 +108,7 @@ write.table(tax,
 
 # 2.
 
- write.table(boots.stat,
+ write.table(lineage.stats,
             file = paste0(tag,".PROBS.taxonomy.stats"), 
             sep=" ", 
             append = FALSE, quote = TRUE,
@@ -129,9 +130,14 @@ cat('\n Visualizing some data\n')
 
 
 seqs <- readDNAStringSet(fasta.file)
+
+seqs <- seqs[names(seqs) %in% rownames(boots),]
+
 seqs.width <- width(seqs)
 
+
 plot <- data.frame(nbases = seqs.width, boots)
+
 plot.melt <- melt(plot, id.vars='nbases', 
                         value.name = 'boots',
                         variable.name = "Rank")
@@ -152,18 +158,44 @@ p +
   guides(color = FALSE)
 
 # 2.
-colourCount = nrow(boots.stat)
+colourCount = nrow(lineage.stats)
 getPalette = colorRampPalette(brewer.pal(12, "Paired"))
 
 p <- NULL
-p <- ggplot(boots.stat, aes(x=sd, y=mean, color=Rank, size = ntaxa ))
+p <- ggplot(lineage.stats, aes(x=sd, y=mean, color=lineage, size = ntaxa ))
 p + geom_point() +
-scale_color_manual(values = c(getPalette(colourCount)), na.value = "grey", guide = guide_legend(ncol=1)) +
+scale_color_manual(values = c(getPalette(colourCount)), na.value = "grey", guide = guide_legend(ncol=2)) +
   theme_minimal() +
   labs(title = "Grupos taxonómicos asignados",
        subtitle = "Proporción de asignaciones taxonómicas",
        caption = "La media y desviación estándar (sd) son calculadas para cada grupo taxonómico", 
        x = "% Bootstrap (sd)", y = "% Bootstrap (mean)")
+
+# 3. 
+boots.stat <- aggregate(plot.melt[,3], by=list(plot.melt[,2]), 
+                    FUN = function(x) c(mean = mean(x), 
+                                        median = median(x),
+                                        sem =sd(x)/ sqrt(length(x)),
+                                        sd = sd(x),
+                                        sem_min = mean(x) - 2*sd(x)/ sqrt(length(x)),
+                                        sem_max = mean(x) + 2*sd(x)/ sqrt(length(x)),
+                                        ntaxa = length(x[x >= 99 ]),
+                                        mintax = min(x),
+                                        maxtax = max(x) ))
+
+boots.stat <- data.frame(Rank = boots.stat[,1], boots.stat[,2])
+
+pd <- position_dodge(0.1) 
+
+ggplot(boots.stat, aes(x = Rank, y = mean, group = Rank)) + 
+    geom_errorbar(aes(ymin=sem_min, ymax=sem_max), width=.1, position=pd) +
+    geom_line(position=pd) +
+    geom_point(position=pd, aes(size = ntaxa)) + 
+    scale_color_brewer(palette = "Blues", direction = -1) + theme_minimal() +
+    labs(title = "Confiabilidad de las asignaciones taxonómicas",
+       subtitle = "Se muestra la media del valor del bootstrap a lo largo de los niveles taxonómicos",
+       caption = "El tamaño de los puntos presenta el número de taxones asignados con un valor igual o mayor a 99 del bootstrap.", 
+       x = "Ranking taxonómico", y = "% Bootstrap (Media)")
 
 cat('\n Done! \n')
 
