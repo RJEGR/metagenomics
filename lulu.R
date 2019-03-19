@@ -15,7 +15,6 @@ system("mkdir -p downstream")
 # ===============
 # Check and load package:
 # ===============
-.bioc_packages <- c("biomformat")
 
 if (!require("lulu")) {   
   if (!require('devtools', lib.loc = lib.loc)) {
@@ -23,6 +22,8 @@ if (!require("lulu")) {
   } else 
     devtools::install_github("tobiasgf/lulu")
 }
+
+.bioc_packages <- c("biomformat")
 
 .inst <- .bioc_packages %in% installed.packages()
 if(any(!.inst)) {
@@ -32,7 +33,7 @@ if(any(!.inst)) {
 }
 
 # Load packages into session, and print package version
-sapply(c(.git_packages, .bioc_packages), require, character.only = TRUE)
+sapply(c("lulu", .bioc_packages), require, character.only = TRUE)
 
 
 # # # # # #
