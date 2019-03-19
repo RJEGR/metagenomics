@@ -57,24 +57,8 @@ vsearch.file = args[1]
 shared.file = args[2]
 taxonomy.file = args[3]
 
-
-# # # # # # # # # # # # # # # #
-# define prefix for save resuls:
-# # # # # # # # # # # # # # # #
-
-out.prefix <- strsplit(shared.file, "[.]")
-shared.out.prefix <- do.call(paste, 
-                             c(as.list(out.prefix[[1]][-length(out.prefix[[1]])]), 
-                               sep = '.',collapse = ''))
-
-out.prefix <- NULL
-
-out.prefix <- strsplit(taxonomy.file, "[.]")
-tax.out.prefix <- do.call(paste, 
-                             c(as.list(out.prefix[[1]][-length(out.prefix[[1]])]), 
-                               sep = '.',collapse = ''))
 # # # # # # # #
-# Running lulu
+# lulu inputs
 # # # # # # # #
 
 #  Match list (vsearch used for all OTUs (Representative seq) with 0.03 % similitud)
@@ -83,6 +67,32 @@ matchlist <- read.table(vsearch.file , header=FALSE, as.is=TRUE, stringsAsFactor
 shared <- read.csv(shared.file, sep="\t", header=TRUE, stringsAsFactors=FALSE)
 otutab <- shared[,-c(1,2,3)]
 otutab <- as.data.frame(t(otutab))
+
+
+# # # # # # # # # # # # # # # #
+# define prefix for save resuls:
+# # # # # # # # # # # # # # # #
+# out.prefix[[1]][-c(1, length(out.prefix[[1]]))]
+out.prefix <- strsplit(shared.file, "[.]")
+shared.out.prefix <- do.call(paste, 
+                             c(as.list(out.prefix[[1]][-c(1, length(out.prefix[[1]]))]), 
+                               sep = '.',collapse = ''))
+
+out.prefix <- NULL
+
+out.prefix <- strsplit(taxonomy.file, "[.]")
+tax.out.prefix <- do.call(paste, 
+                             c(as.list(out.prefix[[1]][-c(1, length(out.prefix[[1]]))]), 
+                               sep = '.',collapse = ''))
+
+rds <- paste0(path, "/", "lulu_curated_result.rds")
+# options(stringsAsFactors = FALSE)
+NO_REUSE = F
+
+if (file.exists(rds) && ! NO_REUSE) {
+    print('RESTORING DATA FROM EARLIER ANALYSIS')
+    curated_result <- readRDS("curated_result.rds")
+} else {
 
 # # # # # # # # # # #
 # Run lulu algorithm
@@ -98,7 +108,9 @@ curated_result <- lulu(otutab, matchlist, minimum_ratio_type = "min",
 # # # # # # # # # # #
 
 # Save the curated_result object to a file
-saveRDS(curated_result, "curated_result.rds")
+saveRDS(curated_result, paste0(path, "/", "lulu_curated_result.rds"))
+# saveRDS(curated_result, rds)
+}
 
 # Restore it later
 # curated_result <- readRDS("curated_result.rds")
@@ -157,15 +169,15 @@ write.table(otu_map,
             sep = " ", quote = FALSE)
 
 # 2.
-write.table(curated_table, file = paste0(path,"/" ,shared.out.prefix, ".lulu", ".shared"),
+write.table(curated_table, file = paste0(path,"/" , "lulu.", shared.out.prefix, ".shared"),
             sep = "\t", quote = FALSE)
 # 3.
 tax.out <- data.frame(OTU = taxonomy[,1],
                       Size = taxonomy[,2], 
-                      Taxonomy = tidyr::unite(tax, sep = ";")[,1])
+                      Taxonomy = apply(tax[,rank.names] , 1 , paste , collapse = ";"))
 
 # 3.1
-write.table(tax.out, file = paste0(path, "/", tax.out.prefix, ".lulu", ".taxonomy"),
+write.table(tax.out, file = paste0(path, "/", "lulu.", tax.out.prefix, ".taxonomy"),
             sep = "\t", quote = FALSE,
             row.names = FALSE)
 
@@ -197,5 +209,8 @@ write_biom(biom.out, paste0(path, "/", "lulu", "_",
                             "min_match_", min_match, "_",
                             "min_ratio_", min_r,
                             ".biom"))
+
+
+cat("\n Lulu performed ok! ...\n")
 
 quit(save = 'no')

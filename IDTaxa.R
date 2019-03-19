@@ -225,7 +225,6 @@ writeLines(output_confidence, paste0(path, '/', out_name, ".confidence"))
 
 quit(save='no')
 
-
 summary(confidence <- sapply(ids,
                              function (id) {
                                round(id$confidence, digits=1)
