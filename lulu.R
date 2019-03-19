@@ -23,7 +23,7 @@ system("mkdir -p downstream")
 if(any(!.inst)) {
   if (!require("devtools", quietly = TRUE))
     install.packages("devtools", dep=TRUE, repos='http://cran.us.r-project.org')
-    devtools::install_github(git_packages[!.inst], ask = F)
+    devtools::install_github(.git_packages[!.inst], ask = F)
 }
 
 
@@ -91,7 +91,7 @@ NO_REUSE = F
 
 if (file.exists(rds) && ! NO_REUSE) {
     print('RESTORING DATA FROM EARLIER ANALYSIS')
-    curated_result <- readRDS("curated_result.rds")
+    curated_result <- readRDS(rds)
 } else {
 
 # # # # # # # # # # #
