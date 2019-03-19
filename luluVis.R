@@ -25,7 +25,7 @@ sapply(c(.bioc_packages), require, character.only = TRUE)
 setwd('/Users/cigom/metagenomics/run13_18S/downstream')
 
 # 1.
-curated_result <- readRDS("curated_result.rds")
+curated_result <- readRDS("lulu_curated_result.rds")
 otu_map <- curated_result$otu_map
 
 

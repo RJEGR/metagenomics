@@ -15,17 +15,14 @@ system("mkdir -p downstream")
 # ===============
 # Check and load package:
 # ===============
-
-.git_packages <- c("lulu")
 .bioc_packages <- c("biomformat")
 
-.inst <- .git_packages %in% installed.packages()
-if(any(!.inst)) {
-  if (!require("devtools", quietly = TRUE))
+if (!require("lulu")) {   
+  if (!require('devtools', lib.loc = lib.loc)) {
     install.packages("devtools", dep=TRUE, repos='http://cran.us.r-project.org')
-    devtools::install_github(.git_packages[!.inst], ask = F)
+  } else 
+    devtools::install_github("tobiasgf/lulu")
 }
-
 
 .inst <- .bioc_packages %in% installed.packages()
 if(any(!.inst)) {
