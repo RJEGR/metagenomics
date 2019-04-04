@@ -102,31 +102,4 @@ data <- as_tibble(data.frame( ASV = midori$ASV,
                     stringsAsFactors =  FALSE)
                     )  # NOT ABS VALUE IN DIFF
 
-# Calculate distance:
-
-# Computes pairwise string distances between elements
-library('stringdist')
-
-# We  use is the Levenshtein Distance which is simply the 
-# single character edit distance between two strings by 
-# a combination of insertions, deletions, or substitutions
-
-dist <- as_tibble(data.frame(data, dist = stringdist(data$lineage_x, data$lineage_y, method = 'lv'))) # inf values reported
-
-
-# ahora comprobamos que los niveles de cambio zero sean consistentes en su asignacion:
-
-disvis <- dist[dist$diff != 0 ,]
-
-
-plot(density(disvis$dist), main = 'Comparing DB assignations by String Distance')
-lines(stats::lowess(disvis$dist))
-
-
-d <- stringdistmatrix(disvis$lineage_x, disvis$lineage_y, useNames="none", method = 'lv') 
-library(superheat)
-
-superheat(d, row.dendrogram = TRUE, col.dendrogram = TRUE)
-
-
 quit(save = 'no')
