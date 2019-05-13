@@ -68,7 +68,7 @@ rownames(y) <- TL[-1]
 
 .mc_df_ = do.call(rbind, sapply(lapply(x, `[[`, 'mc_df'), nrow))
 .mc_df_ok_ = do.call(rbind, sapply(lapply(x, `[[`, 'mc_df_ok'), nrow))
-.ac_df_ = do.call(rbind, sapply(lapply(x, `[[`, 'ac_df'), nrow, use.))
+.ac_df_ = do.call(rbind, sapply(lapply(x, `[[`, 'ac_df'), nrow))
 .scn_names_ = data.frame(sapply(sapply(x, `[[`, 'snc_names'), length))
 
 y[which(rownames(.mc_df_) %in% rownames(y)),1] <- .mc_df_
@@ -79,7 +79,8 @@ y[which(rownames(.scn_names_) %in% rownames(y)),4] <- .scn_names_
 names(y) <- c('mc_df', 'mc_df_ok', 'ac_df', 'snc_names')
 y
 
-# for(L in 7:2){ nc_df <- rdp_new[which(rdp_new[, TL[L]] %in% snc_names[[TL[L]]]), TL] }
+for(L in 7:2){ nc_df <- list(rdp_new[which(rdp_new[, TL[L]] %in% snc_names[[TL[L]]]), TL]) }
+
 # nc_df <- do.call(rbind, lapply(nc_df, data.frame,  stringsAsFactors=FALSE)) %>% unite("lineage", TL, sep=";", remove = TRUE)
 
 

@@ -18,8 +18,15 @@ cat('1. Reading file at time:', (d <- format(Sys.time(), "%H:%M:%S")), '\n')
 
 
 file = args[1]
+
+# By default keep species is TRUE
+if (is.na(args[2])) {
+    keep_spp <- TRUE
+} else
+keep_spp = args[2]
+
 kingdom <- strsplit(file, '[.]')[[1]][2]
-root.rank <- paste0('root',';', kingdom)
+root.rank <- paste0('root;Eukaryota',';', kingdom)
 colnames <- c('Id', 'Filo', 'Clase', 'Orden', 'Familia', 'Genero', 'Especie', 'Secuencia')
 # read.table(vsearch.file , header=FALSE, as.is=TRUE, stringsAsFactors=FALSE)
 x <- read.csv(file, header=FALSE, sep='\t', na.strings=c("","NA"), stringsAsFactors=FALSE)
@@ -27,7 +34,11 @@ names(x) <- colnames
 
 cat('2. Keeping only the Specie resolution ...\n')
 
-x <- x[complete.cases(x),]
+
+if (keep_spp) { x <- x[complete.cases(x),] }
+
+
+
 
 Id <- make.unique(as.vector(x[,1]), sep = "_")
 

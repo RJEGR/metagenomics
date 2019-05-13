@@ -1,0 +1,148 @@
+
+hacer base de datos 
+bold-Families
+
+fish-base
+escenarios de taxones:
+
+por su distribucion en el mar podemos definir que hay falsos positivos.
+
+
+- plot tre of fit sequences to decipher where undetermined are (run14)
+    - run014_t2_fitGTR-tree.rds
+/LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/dada2_asv/run14_20190228_COI
+# hay un error con al cargar el rds y convertir en objeco as_data_frame(tree), por el formato phylo ...
+
+- plot mapa of richness of X06 and label with the max.abundance taxa. (listo!)
+
+- aligment mock to sieve iREADS (iDNA):
+
+
+
+
+$ git submodule init
+$ git submodule update
+# brew install ant
+
+/LUSTRE/bioinformatica_data/genomica_funcional/bin/RDPTools
+ # problemas al instalar del git el RDPtools
+# precompile usage
+ln -s /Users/cigom/Documents/Tools/rdp_classifier_2.12/dist/classifier.jar
+
+cd /Users/cigom/metagenomics/COI/run012/mock_P68/mock_parameter_definition
+
+java -Xmx1g -jar classifier.jar classify -c 0.5 -o usga_classified.txt -h soil_hier.txt samplefiles/USGA_2_4_B_trimmed.fasta
+# define database form for classifier.jar
+
+# filtering sequences
+
+66714 / 69545 secuencias tuvieron match con la mock
+
+
+# 1. Fix headers name due to fastq_screen 
+
+zcat 012-X04-P68-COI-ICT_S46_L001_R1_001.fastq.gz | awk '/^@M/{print $1; next}{print}' > 012-X04-P68-COI-ICT_S46_L001_R1_001.fastq.headers
+zcat 012-X04-P68-COI-ICT_S46_L001_R2_001.fastq.gz | awk '/^@M/{print $1; next}{print}' > 012-X04-P68-COI-ICT_S46_L001_R2_001.fastq.headers
+
+file_R1=012-X04-P68-COI-ICT_S46_L001_R1_001.fastq.headers
+file_R2=012-X04-P68-COI-ICT_S46_L001_R2_001.fastq.headers
+
+# 2. Filter sequences by sanger from mock
+fastq_screen --aligner bowtie2 --conf fastqscreen.conf --subset 0 --filter 3---- --tag --force --outdir ./fastq_screen/ $file_R1
+
+# 3. Fix headers name due to fastq_screen
+filtered=fastq_screen/012-X04-P68-COI-ICT_S46_L001_R1_001.fastq.headers.tagged_filter.fastq
+awk '/^@M/{gsub(/[#FQST]/, " "); print ""$1; next}{print}' < $filtered > 012-X04-P68-COI-ICT_S46_L001_R1_001.mock_hits.fastq
+
+# 4.  Parse R2 reads based on R1 filtered reads
+mock_hits_R1=012-X04-P68-COI-ICT_S46_L001_R1_001.mock_hits.fastq
+awk '/^@M/{print $1}' < $mock_hits_R1 > 012-X04-P68-COI-ICT_S46_L001_R1_001.mock_hits.ids
+grep "^@M" < $mock_hits_R1 > 012-X04-P68-COI-ICT_S46_L001_R1_001.mock_hits.ids
+
+list=012-X04-P68-COI-ICT_S46_L001_R1_001.mock_hits.ids
+
+# 5. get sequences based on a list
+
+awk 'NR==FNR{a["@"$0];next}/^@/{f=0;}($0 in a)||f{print;f=1}'  | head
+
+grep -A 3 -Ff $list $file_R2 | sed '/^--$/d' > 012-X04-P68-COI-ICT_S46_L001_R2_001.mock_hits.fastq
+
+awk '/^@M/{print $1}' < 012-X04-P68-COI-ICT_S46_L001_R2_001.mock_hits.fastq > 012-X04-P68-COI-ICT_S46_L001_R2_001.mock_hits.ids
+
+diff *ids
+
+
+awk '{s++}END{print s/4}' 012-X04-P68-COI-ICT_S46_L001_R2_001.mock_hits.fastq
+awk '{s++}END{print s/4}' 012-X04-P68-COI-ICT_S46_L001_R1_001.mock_hits.fastq
+
+# Additionals
+# get back the hit_no_genome reads
+fastq_screen --conf ../fastqscreen.conf --nohits 012-X04-P68-COI-ICT_S46_L001_R1_001.fastq.headers.tagged.fastq
+no_hits=012-X04-P68-COI-ICT_S46_L001_R1_001.fastq.headers.tagged.tagged_filter.fastq
+awk '{s++}END{print s/4}' $no_hits
+awk '/^@M/{gsub(/[#FQST]/, " "); print ""$1; next}{print}' < $no_hits > 012-X04-P68-COI-ICT_S46_L001_R1_001.no_hits.fastq
+no_hits=012-X04-P68-COI-ICT_S46_L001_R1_001.no_hits.fastq
+grep "^@M" -A 1 $no_hits | sed '/^--$/d' | sed 's/^@/>/g' > 012-X04-P68-COI-ICT_S46_L001_R1_001.no_hits.fasta
+
+# 66714 / 69545
+
+# then run dada pipeline
+
+        truncLen:  220 180 
+        truncQ:  10 
+        maxEE:  2 4 
+        minLen:  120 
+        rm.phix:  TRUE 
+
+sbatch dada2_coi.sh t1 data_filtered/
+
+# Correr manualmente en el escritorio !!!
+> print(out)
+            reads.in reads.out
+X04-P68-ICT    66714     56042
+
+Identified 3 bimeras out of 78 input sequences.
+ASVs proportion identified as bimeras:  3.846154 %
+
+ajustar texto del script para automatizar ciclos de analisis, (desde el cluster y el escritorio)
+procesar la taxonomia de los parameros relax
+
+
+
+fasta=$1
+boots=$2
+outdir=$3
+
+sbatch rdp_assign_v02.sh mock_hits_relax_ASVs.fasta 80 assignation/
+
+descargar los analisis del bootstrap a 0, 80 y 99 y visualizar!
+
+file = 'mock_hits_relax_ASVs.ictio_coi_sanger114.wang.taxonomy'
+source(file = "~/Documents/GitHub/metagenomics/converted2worms/cigom_load_dada2_tables.R")
+sanger <- read.wangtax(file)
+data.frame(table(sanger$Order))
+
+apply(sanger, 2, function(x) data.frame(table(x)))
+
+K - 1
+P - 1
+C - 1
+O- 10
+F - 33
+G - 56
+
+
+
+# Zero results
+vsearch --usearch_global ictio_coi_sanger114.fasta --db dada2_asv/run012_20190329_COI/mock_hits_relax_ASVs.fasta --self --id .84 --iddef 1 --userout mock_hits_relax_ASVs_vs_ictio_coi_sanger114.vsearch.list -userfields query+target+id --maxaccepts 0 --query_cov .80 --maxhits 10
+# Matching query sequences: 37 of 75 (49.33%)
+vsearch --usearch_global dada2_asv/run012_20190329_COI/mock_hits_relax_ASVs.fasta --db dada2_asv/run012_20190329_COI/mock_hits_relax_ASVs.fasta --self --id .84 --iddef 1 --userout mock_hits_relax_ASVs.vsearch.list -userfields query+target+id --maxaccepts 0 --query_cov .9 --maxhits 10
+# Matching query sequences: 78 of 114 (68.42%)
+vsearch --usearch_global ictio_coi_sanger114.fasta --db ictio_coi_sanger114.fasta --self --id .84 --iddef 1 --userout ictio_coi_sanger114.vsearch.list -userfields query+target+id --maxaccepts 0 --query_cov .9 --maxhits 10
+
+
+for i in *fasta
+do sbatch rdp_assign_v02.sh $i 99 assignation_99/
+done
+
+DB=/LUSTRE/bioinformatica_data/genomica_funcional/MG_COI/dbs/BOLD/

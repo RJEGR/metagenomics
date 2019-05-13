@@ -1,6 +1,4 @@
-loessErrfun
-function (trans) 
-{
+loessErrfun <- function (trans) {
     qq <- as.numeric(colnames(trans))
     est <- matrix(0, nrow = 0, ncol = length(qq))
     for (nti in c("A", "C", "G", "T")) {
