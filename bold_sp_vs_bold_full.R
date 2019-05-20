@@ -22,18 +22,14 @@ library(reshape2)
 # Set filenames ----
 path_BOLD <- '/Users/cigom/metagenomics/COI/species_resolution_per_db'
 bold_all <- 'run014_t2_ASVs.ALL.wang.taxonomy'
-bold_sp <- 'run014_t2_ASVs.BOLD_public_species_v02.wang.taxonomy'
+bold_sp <- 'run014_t2_ASVs.BOLD_public_species.wang.taxonomy'
 
 
 # Load files ----
 full.taxa.obj <- read_rdp(paste0(path_BOLD,'/',bold_all))
 sp.taxa.obj <- read_rdp(paste0(path_BOLD,'/',bold_sp))
 
-TL <- c("root","Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
-
-# Special procedure to full db ----
-full.taxa.obj$SL <- full.taxa.obj$SL - 1
-full.taxa.obj <- full.taxa.obj[,c(1,3:10)]
+TL <- c("root","Domain","Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
 
 colnames(full.taxa.obj) <- c(TL, 'SL')
 colnames(sp.taxa.obj) <- c(TL, 'SL')
@@ -48,21 +44,24 @@ SL <- rbind(data.frame(SL = full.taxa.obj$SL,
                        DataBase = 'SP'))
 
 
-SL <- SL[SL$SL > 0 ,]
-SL$SL <- factor(SL$SL, levels = 1:7)
+# SL <- SL[SL$SL > 0 ,]
+SL$SL <- factor(SL$SL, levels = names(table(SL$SL)))
 
 # and
 SL_agg <- aggregate(SL[,'DataBase'], by=list(SL[,'SL']), FUN = table)
 SL_agg <- data.frame(level = SL_agg[,1], SL_agg[,2])
-SL_agg$Rank <- TL[-8]
+SL_agg$Rank <- TL[-1]
 SL_aggM <- melt(SL_agg)
-SL_aggM$Rank <- factor(SL_aggM$Rank, levels = TL[-8])
+SL_aggM$Rank <- factor(SL_aggM$Rank, levels = TL[-1])
+SL_aggM$variable <- factor(SL_aggM$variable, levels = c("full","SP"))
 
 ggplot(SL_aggM, aes(x=Rank, y=value, group=variable, fill=variable, color=variable)) + 
   geom_point(size=2, alpha=0.6) + geom_line(size=1, alpha=0.6, linetype="dashed") +
   geom_text(data = SL_aggM, aes(label=value), size=4, vjust=1, color = 'black') +
-  scale_color_brewer(palette = "Set1")
-  #labs(title="BOLD species - BOLD full db taxonomy Difference"
+  scale_color_brewer(palette = "Set1") +
+  labs(title="BOLD species & BOLD full db taxonomy Difference",
+       x = 'Taxonomy level',
+       y = '# ASVs')
        #subtitle=paste0("",
        #caption=paste0("") 
 
