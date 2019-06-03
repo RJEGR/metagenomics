@@ -2,35 +2,16 @@
 
 rm(list=ls()); 
 
+# Clear plots
+# if(!is.null(dev.list())) dev.off()
+# Clear console
+# cat("\014") 
+
 # Functions ----
 
 options(stringsAsFactors = FALSE)
-
-mrank <- function(x) {
-  x_ <- NULL
-  for (i in 1:nrow(x)) {
-  rl <- x$SL[i] + 1
-  # x_[[i]] <- list(rank=names(x)[rl], linage=x[i,rl]) }
-  x_[[i]] <- names(x)[rl]
-  }
-  return(x_)
-}
-
 #
 
-db_color <- function(x) {
-  x$Ref <- 'full'
-  x[x$x_y > 0, 'Ref'] <- 'sp' 
-  return(x)
-}
-
-#
-
-aglom_ab <- function(x,rank) {
-  tax_g <- aggregate(x[,'abund'],  by = list(x[, rank]), FUN = sum)
-  tax_g <- data.frame(lineage = tax_g[,1], Size = tax_g[,2])
-  return(tax_g)
-}
 source(file = "~/Documents/GitHub/metagenomics/readtx.R")
 
 library(ggplot2)
@@ -144,29 +125,20 @@ ggplot(subset(diff_x_y, Change != 0), aes(x=Change, y=log10(Freq), group=Ref, fi
   geom_text(data = subset(diff_x_y, Change != 0), aes(label=Freq), size=4, vjust=1, color = 'black') +
   scale_color_brewer(palette = "Set1") +
   scale_fill_brewer(palette = "Set1") +
-  labs(title="Number of ASVs with difference in the assignation")
+  labs(title= paste0("Number of ASVs with difference in the assignation"),
+       subtitle = paste0("The number of shared asvs are: ", max(diff_x_y$Freq)) )
 
 # or
-
 #if(full_non_sp[,1] == 'root') {full_non_sp <- full_non_sp[-1]}
 #if(sp_non_sp[,1] == 'root') {sp_non_sp <- sp_non_sp[-1]}
 
 # ranking labels ----
 
 # .... 1
-x_ <- NULL
-for (i in 1:nrow(sp.taxa.obj)) {
-  rl <- sp.taxa.obj$SL[i] + 1
-  x_[[i]] <- names(sp.taxa.obj)[rl]
-}
+x_ <- lrank(sp.taxa.obj)
 
 # 2.
-y_ <- NULL
-for (i in 1:nrow(full.taxa.obj)) {
-  rl <- full.taxa.obj$SL[i] + 1
-  y_[[i]] <- names(full.taxa.obj)[rl]
-  
-}
+y_ <- lrank(full.taxa.obj)
 
 # 1.
 x_y_rank <- data.frame(ASV = rownames(sp.taxa.obj), 
@@ -176,23 +148,23 @@ x_y_rank <- data.frame(ASV = rownames(sp.taxa.obj),
                        x_y = sp.taxa.obj$SL - full.taxa.obj$SL,
                        stringsAsFactors = FALSE)
 
+table(select(filter(x_y_rank, x_y == 0), sp)) == table(select(filter(x_y_rank, x_y == 0), full))
 
 # 2.
-x_y_rank_m <-  melt(x_y_rank, id.vars = c('ASV', 'x_y'),
+x_y_rank_m <-  melt(filter(x_y_rank, x_y != 0), id.vars = c('ASV', 'x_y'),
                      variable.name = 'DataBase',
                      value.name = 'Rank')
 
-x_y_rank_m$Rank <-  factor(x_y_rank_m$Rank, levels = TL) 
+x_y_rank_m$Rank <-  factor(x_y_rank_m$Rank, levels = TL[-1])
 
 levels <- c('full', 'sp')
 
 x_y_rank_m$DataBase <-  factor(x_y_rank_m$DataBase, levels = levels)
-#aggregate(x_y_rank[,'DataBase'], by=list(x_y_rank[,'Rank']), FUN = table)
 
 # Level change by rank
 # agrupa los niveles por Rank y entonces ploteas el panel_grid
 
-ggplot(subset(x_y_rank_m, x_y != 0), 
+ggplot(x_y_rank_m, 
        aes(y=..count.., x=abs(x_y), fill = DataBase)) + 
   geom_histogram(aes(y=..count..), position=position_dodge(), alpha=0.5, bins = 30) +
   #geom_density(alpha=.7) + 
@@ -203,9 +175,6 @@ ggplot(subset(x_y_rank_m, x_y != 0),
   facet_wrap( ~ Rank , scales = 'free_y')
 
 # and the zero across Ranks
-
-table(select(filter(x_y_rank, x_y == 0), sp))
-table(select(filter(x_y_rank, x_y == 0), full))
     
 # alluvial
 
@@ -294,7 +263,10 @@ ggplot(data = alluv,
 # x <- x_y_rank[x_y_rank$x_y !=0, ]
 
 
-x <- melt(alluv[alluv$x_y !=0, c('ASV', 'sp','full')], id.vars  = c('ASV'),
+str(input_dat <- x_y_rank[x_y_rank$x_y !=0, c('ASV', 'sp','full')])
+# str(input_dat <- alluv[alluv$x_y !=0, c('ASV', 'sp','full')])
+
+x <- melt(input_dat, id.vars  = c('ASV'),
           variable.name = 'DataBase',
           value.name = 'Rank')
 
@@ -303,17 +275,21 @@ x$DataBase <- factor(x$DataBase, levels = levels)
 # insert filter to functio bbold
 
 # source(file = "~/Documents/GitHub/metagenomics/readtx.R")
-dim(out <- bbold(filter(x, Rank == TL[2:6]), fasta_file = fasta_file, count_tbl = count_tbl)) # 847
 
+dim(out <- bbold(filter(x, Rank == TL[2:6]), fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = TRUE)) # 799 using x_y_rank instead of alluv
+# dim(out[out$abund > 1, ]) # remove singletones if non relative abundance
+
+ggplot(out, aes(seq_size, log(abund), color = abund)) +
+  geom_point(alpha = 0.7)
 
 summary(out$abund)
 # Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-# 1.0     10.0     25.0    456.2     65.0 191253.0 
+# 0.000019 0.000180 0.000454 0.010729 0.001257 3.616235
+
 summary(out$seq_size)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-# 269.0   313.0   313.0   312.1   313.0   320.0
+# 273.0   313.0   313.0   312.3   313.0   319.0
 
-dim(out <- out[out$abund > 1, ]) # 841
 
 # remove singletones
 

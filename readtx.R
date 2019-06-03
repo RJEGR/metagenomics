@@ -54,7 +54,7 @@ read_rdp <- function(taxonomy.file) {
 
 # bold-sp vs bold-full ----
 # bbold(filter(x, full == TL[2:6]), fasta_file = fasta_file, count_tbl = count_tbl)
-bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl) {
+bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = x_y_rank, rel_ab = TRUE) {
   
   require(Biostrings)
   
@@ -63,19 +63,22 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl) {
   # 1) abundance ----
   
   count.tbl0 <- read.table(paste0(path_BOLD, "/",count_tbl))
-
+  total <- sum(rowSums(count.tbl0))
+  nreads <- rowSums(count.tbl0)
+  
   # count.tbl <- data.frame(ASV = rownames(count.tbl0[rownames(count.tbl0) %in% db_subset, ]),
   #                         abund = rowSums(count.tbl0[rownames(count.tbl0) %in% db_subset, ]))
   
-  total <- sum(rowSums(count.tbl0))
-  nreads <- rowSums(count.tbl0)
-  # dim(out <- out[out$abund > 1, ]) 
-  rabund <- data.frame(ASV = names(nreads),
-                       rabund = (nreads / total) * 100)
-  
-  
-  rabund0 <- rabund[rabund$ASV %in% db_subset, ]
-  rabund0 <- rabund0[match(db_subset, rownames(rabund0)),]
+  if(rel_ab) {
+    rabund <- data.frame(ASV = names(nreads), rabund = (nreads / total) * 100)
+    
+    rabund0 <- rabund[rabund$ASV %in% db_subset, ]
+    rabund0 <- rabund0[match(db_subset, rownames(rabund0)),] 
+    } else {
+    rabund0 <- data.frame(ASV = names(nreads), rabund = nreads)
+    rabund0 <- rabund0[match(db_subset, rownames(rabund0)),] 
+    
+  }
   
   if(identical(rownames(rabund0), db_subset)) {
     
@@ -142,7 +145,71 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl) {
      }
     }
   
-  return(out)
+  # return(out)
+  
+  # additional ----
   
   
+  if(exists("x_y_rank")) {
+    require(dplyr)
+    out %>%
+      group_by(ASV) %>%
+      inner_join(x_y_rank, by = 'ASV') %>%
+      select(-sp, -full) %>%
+      db_color() -> out0
+    return(out0)
+  } else {
+    out0 <- out
+    return(out0)
+  }
+  
+}
+
+# alluvial colored ----
+db_color <- function(x) {
+  # use for object alluv <- subset(x_y_rank, x_y != 0 & full != 'root')
+  x$Ref <- 'full'
+  x[x$x_y > 0, 'Ref'] <- 'sp' 
+  return(x)
+}
+
+# count out levels ----
+aglom_ab <- function(x,rank) {
+  # use object from tax_sp <- select(out, abund, paste("sp", TL2, sep="_"))
+  tax_g <- aggregate(x[,'abund'],  by = list(x[, rank]), FUN = sum)
+  tax_g <- data.frame(lineage = tax_g[,1], Size = tax_g[,2])
+  return(tax_g)
+}
+
+# get back the last rank based on the SL ----
+
+lrank <- function(x) {
+  x_ <- NULL
+  for (i in 1:nrow(x)) {
+    rl <- x$SL[i] + 1
+    x_[[i]] <- names(x)[rl]
+  }
+  return(x_)
+}
+
+# get back the last lineage based on the SL  ----
+
+llineage <- function(x) {
+  x_ <- NULL
+  for (i in 1:nrow(x)) {
+    rl <- x$SL[i] + 1
+    # x_[[i]] <- list(rank=names(x)[rl], linage=x[i,rl]) }
+    x_[[i]] <- x[i,rl]
+  }
+  return(x_)
+}
+
+# additional step to bbold ---
+bbold_ <- function(x, x_y_rank) {
+  x %>%
+    group_by(ASV) %>%
+    inner_join(x_y_rank, by = 'ASV') %>%
+    select(-sp, -full) %>%
+    db_color() -> R_out
+  return(R_out)
 }
