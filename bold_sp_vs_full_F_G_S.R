@@ -1,9 +1,30 @@
+#!/usr/bin/env Rscript
 # RUN FIRST bold.sp_vs_bold_full.R in order to make the alluv object:
 # difine input:
 # Load data ----
 
 rm(list=ls()); 
+# if(!is.null(dev.list())) dev.off()
+# Clear plots
 
+# Functions ----
+
+options(stringsAsFactors = FALSE)
+#
+source(file = "~/Documents/GitHub/metagenomics/readtx.R")
+
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+
+
+# Set filenames ----
+path_BOLD <- '/Users/cigom/metagenomics/COI/species_resolution_per_db'
+bold_all <- 'run014_t2_ASVs.ALL.wang.taxonomy'
+bold_sp <- 'run014_t2_ASVs.BOLD_public_species.wang.taxonomy'
+fasta_file <- 'run014_t2_ASVs.fasta'
+count_tbl <- 'run014_t2_ASVs_count.table'
+# Load files ----
 
 full.taxa.obj <- read_rdp(paste0(path_BOLD,'/',bold_all))
 sp.taxa.obj <- read_rdp(paste0(path_BOLD,'/',bold_sp))
@@ -15,6 +36,9 @@ TL2 <- c("D", "K", "P", "C", "O", "F", "G", "S")
 scale2 <- c("Domain"="#edf8b1",  "Kingdom"="#7fcdbb", "Phylum"="#2c7fb8",  
            "Class"="#feb24c",  "Order"="#addd8e",  "Family"="#31a354",
            "Genus"="#bcbddc", "Species"="#756bb1")
+
+scale <- c("incomplete"="#E41A1C",  "complete"="#377EB8")
+
 
 colnames(full.taxa.obj) <- c(TL, 'SL')
 colnames(sp.taxa.obj) <- c(TL, 'SL')
@@ -118,8 +142,6 @@ round(sum(filter(out, Ref == 'complete')$abund), digits = 2) # 1.65 (removing du
 round(sum(filter(out, Ref == 'incomplete')$abund), digits = 2) # 4.45 (removing duplicates)
 
 round(sum(out$abund)) # percent of reads within different ASV assingation between db is 6% ( with TL[2] and TL[3] )
-
-scale <- c("incomplete"="#E41A1C",  "complete"="#377EB8")
 
 ggplot(out, aes(seq_size, log(abund), color = Ref, shape = Ref)) +
   geom_point(alpha = 0.7, aes(size = abund)) + theme_bw() + 
