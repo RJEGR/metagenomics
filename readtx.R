@@ -83,12 +83,12 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = 
   if(identical(rownames(rabund0), db_subset)) {
     
     count.tbl <- data.frame(ASV = rownames(count.tbl0[rownames(count.tbl0) %in% db_subset, ]),
-                            abund = rabund0$rabund) }
-  
-  count.tbl <- count.tbl[match(db_subset, count.tbl$ASV),]
+                            abund = rabund0$rabund)
+    count.tbl <- count.tbl[match(db_subset, count.tbl$ASV),]
+    }
   
 # sanity check
-  if (identical(count.tbl$ASV, db_subset) == FALSE) stop('... Stopping. 1');
+  if (identical(as.character(count.tbl$ASV), db_subset) != TRUE) stop('... The order in the count.tbl is distinct than present subset and is needed... Stopping. 1');
   
   # 2) sequence size ----
   seqs0 <- readDNAStringSet(paste0(path_BOLD,'/',fasta_file))
@@ -106,7 +106,7 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = 
   #count.tbl <- count.tbl[match(db_subset, count.tbl$ASV),]
 
 
-  if(identical(names(seqs), count.tbl$ASV)) {
+  if(identical(names(seqs), as.character(count.tbl$ASV))) {
   out <- data.frame(ASV = names(seqs),
                     seq_size = width(seqs),
                     abund = count.tbl$abund,
@@ -129,8 +129,8 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = 
 
 
   TL2 <- c("D", "K", "P", "C", "O", "F", "G", "S")
-  names(full_set) <- paste("full", TL2, sep="_")
-  names(sp_set) <- paste("sp", TL2, sep="_")
+  names(full_set) <- paste("incomplete", TL2, sep="_")
+  names(sp_set) <- paste("complete", TL2, sep="_")
 
 
 # sanity check
@@ -155,7 +155,7 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = 
     out %>%
       group_by(ASV) %>%
       inner_join(x_y_rank, by = 'ASV') %>%
-      select(-sp, -full) %>%
+      select(-complete, -incomplete) %>%
       db_color() -> out0
     return(out0)
   } else {
@@ -168,8 +168,8 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = 
 # alluvial colored ----
 db_color <- function(x) {
   # use for object alluv <- subset(x_y_rank, x_y != 0 & full != 'root')
-  x$Ref <- 'full'
-  x[x$x_y > 0, 'Ref'] <- 'sp' 
+  x$Ref <- 'incomplete'
+  x[x$x_y > 0, 'Ref'] <- 'complete' 
   return(x)
 }
 
@@ -209,7 +209,26 @@ bbold_ <- function(x, x_y_rank) {
   x %>%
     group_by(ASV) %>%
     inner_join(x_y_rank, by = 'ASV') %>%
-    select(-sp, -full) %>%
+    select(-complete, -incomplete) %>%
     db_color() -> R_out
   return(R_out)
+}
+
+# Rank levels to numeric
+
+
+rank_n <- function(x) {
+  x %>%
+    mutate(Rank_n = if_else(Rank == 'Domain', "1",
+                            if_else(Rank == 'Kingdom', "2",
+                                    if_else(Rank == 'Phylum', "3",
+                                            if_else(Rank == 'Class', "4",
+                                                    if_else(Rank == 'Order', "5",
+                                                            if_else(Rank == 'Family', "6",
+                                                                    if_else(Rank == 'Genus', "7",
+                                                                            if_else(Rank == 'Species', "8", "")
+                                                                    )))))))) -> out
+  out$Rank_n <- as.numeric(out$Rank_n)
+  out <- out %>% group_by(ASV)
+  return(out)
 }

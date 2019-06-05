@@ -1,11 +1,9 @@
 #!/usr/bin/env Rscript
 
-rm(list=ls()); 
-
+# rm(list=ls()); 
 # Clear plots
-# if(!is.null(dev.list())) dev.off()
-# Clear console
-# cat("\014") 
+
+if(!is.null(dev.list())) dev.off()
 
 # Functions ----
 
@@ -16,6 +14,9 @@ source(file = "~/Documents/GitHub/metagenomics/readtx.R")
 
 library(ggplot2)
 library(reshape2)
+library(dplyr)
+
+
 # Set filenames ----
 path_BOLD <- '/Users/cigom/metagenomics/COI/species_resolution_per_db'
 bold_all <- 'run014_t2_ASVs.ALL.wang.taxonomy'
@@ -38,9 +39,9 @@ colnames(sp.taxa.obj) <- c(TL, 'SL')
 # SL Level Resolution vis ----
 
 SL <- rbind(data.frame(SL = full.taxa.obj$SL,
-                 DataBase = 'full'),
+                 DataBase = 'incomplete'),
             data.frame(SL = sp.taxa.obj$SL,
-                       DataBase = 'sp'))
+                       DataBase = 'complete'))
 
 
 # SL <- SL[SL$SL > 0 ,]
@@ -49,23 +50,38 @@ SL$SL <- factor(SL$SL, levels = names(table(SL$SL)))
 # and
 SL_agg <- aggregate(SL[,'DataBase'], by=list(SL[,'SL']), FUN = table)
 SL_agg <- data.frame(level = SL_agg[,1], SL_agg[,2])
-SL_agg$Rank <- TL[-1]
-SL_aggM <- melt(SL_agg)
-SL_aggM$Rank <- factor(SL_aggM$Rank, levels = TL[-1])
 
-levels <- c("full","sp")
+
+# sanity check
+asv_size <- nrow(sp.taxa.obj)
+if(nrow(full.taxa.obj) == asv_size) {
+  if(colSums(SL_agg[-1])[1] == asv_size)
+    if(colSums(SL_agg[-1])[2] == asv_size)
+    SL_agg$Rank <- TL[-1]
+    
+  SL_aggM <- melt(SL_agg, id.vars = )
+  SL_aggM$Rank <- factor(SL_aggM$Rank, levels = TL[-1])
+}
+
+SL_aggM$pct <- round(c((SL_agg$incomplete / asv_size ) * 100, (SL_agg$complete / asv_size ) * 100), digits = 0)
+
+
+levels <- c("incomplete","complete")
 
 SL_aggM$variable <- factor(SL_aggM$variable, levels = levels)
+
 
 # taxonomuc resolution ----
 
 ggplot(SL_aggM, aes(x=Rank, y=value, group=variable, fill=variable, color=variable)) + 
   geom_point(size=2, alpha=0.6) + geom_line(size=1, alpha=0.6, linetype="dashed") +
-  geom_text(data = SL_aggM, aes(label=value), size=4, vjust=1, color = 'black') +
+  geom_text(data = SL_aggM, aes(label=pct), size=7, vjust=1, color = 'black', check_overlap = TRUE) +
   scale_color_brewer(palette = "Set1") +
-  labs(title="BOLD species & BOLD full db taxonomy Difference",
+  labs(title="ASVs fully and insufficiently identified due to database composition",
+       subtitle = paste0('The size of the ASV sample is: ', nrow(sp.taxa.obj) ),
        x = 'Taxonomy level',
-       y = '# ASVs')
+       y = '# ASVs') +
+  theme_bw(base_size = 14)
        
 # non_sp selection ----
 
@@ -81,11 +97,11 @@ ggplot(SL_aggM, aes(x=Rank, y=value, group=variable, fill=variable, color=variab
 n_na <- function(x) ( sum(is.na(x))) # sum(is.na(sp_non_sp[,2]))
 
 na_number <- data.frame(
-  sp = apply(sp.taxa.obj[ -10], 2, n_na),
-  full = apply(full.taxa.obj[-10], 2, n_na))
+  complete = apply(sp.taxa.obj[ -10], 2, n_na),
+  incomplete = apply(full.taxa.obj[-10], 2, n_na))
 
 na_number$Level <- rownames(na_number)
-na_number$diff <- na_number$full - na_number$sp
+na_number$diff <- na_number$incomplete - na_number$complete
 na_number_m <- melt(na_number, id.vars = c('Level', 'diff'),
                variable.name = 'DataBase',
                value.name = 'n')
@@ -95,10 +111,11 @@ na_number_m$DataBase <- factor(na_number_m$DataBase, levels = levels)
 
 ggplot(subset(na_number_m, diff != 0), aes(Level, n, fill = DataBase, group = DataBase)) + 
   geom_col(width = 0.4, position = position_dodge(), alpha = 0.7) +
-  geom_text(data = subset(na_number_m, DataBase == 'sp' & diff != 0), aes(label=abs(diff)), size=4, vjust=1, color = 'black') +
+  geom_text(data = subset(na_number_m, DataBase == 'complete' & diff != 0), aes(label=abs(diff)), size=4, vjust=1, color = 'black') +
   scale_fill_brewer(palette = "Set1") +
   labs(x="Rank", y="# ASVs (Undetermined | Unclassified)", 
-       title = 'Number of NAs ASVs across full and species BOLD databases')
+       title = 'Number of NAs ASVs across fully and infufficiently identified BOLD databases') +
+  theme_bw(base_size = 12)
 
 # count the level of change ----
 x <- sp.taxa.obj$SL
@@ -110,14 +127,16 @@ diff_x_y <- data.frame(
             stringsAsFactors = FALSE)
 # 
 
-diff_x_y$Ref <- 'full'
-diff_x_y[diff_x_y[,1] > 0, 'Ref'] <- 'sp'
+diff_x_y$Ref <- 'Shared'
+diff_x_y[diff_x_y[,1] < 0, 'Ref'] <- 'incomplete'
+diff_x_y[diff_x_y[,1] > 0, 'Ref'] <- 'complete'
 
 
 diff_x_y$Change <- abs(diff_x_y$Change)
 diff_x_y$Change <- factor(diff_x_y$Change, levels = 1:6)
-
 diff_x_y$Ref <- factor(diff_x_y$Ref, levels = levels)
+
+diff_val <- sum(diff_x_y$Freq) -  max(diff_x_y$Freq)
 
 ggplot(subset(diff_x_y, Change != 0), aes(x=Change, y=log10(Freq), group=Ref, fill=Ref, color=Ref)) + 
   geom_col(width = 0.4, position = position_dodge(), alpha = 0.7) +
@@ -126,7 +145,8 @@ ggplot(subset(diff_x_y, Change != 0), aes(x=Change, y=log10(Freq), group=Ref, fi
   scale_color_brewer(palette = "Set1") +
   scale_fill_brewer(palette = "Set1") +
   labs(title= paste0("Number of ASVs with difference in the assignation"),
-       subtitle = paste0("The number of shared asvs are: ", max(diff_x_y$Freq)) )
+       subtitle = paste0("The number of shared ASVs are: ", max(diff_x_y$Freq), " and ASVs with change in the assignation due to DataBase: ",diff_val) ) +
+  theme_bw(base_size = 12)
 
 # or
 #if(full_non_sp[,1] == 'root') {full_non_sp <- full_non_sp[-1]}
@@ -142,13 +162,14 @@ y_ <- lrank(full.taxa.obj)
 
 # 1.
 x_y_rank <- data.frame(ASV = rownames(sp.taxa.obj), 
-                            sp= x_, full= y_, 
+                            complete= x_, incomplete= y_, 
                        #SL_x = sp.taxa.obj$SL,
                        #SL_y = full.taxa.obj$SL,
                        x_y = sp.taxa.obj$SL - full.taxa.obj$SL,
                        stringsAsFactors = FALSE)
 
-table(select(filter(x_y_rank, x_y == 0), sp)) == table(select(filter(x_y_rank, x_y == 0), full))
+# sanity check of shared asvs
+table(select(filter(x_y_rank, x_y == 0), complete)) == table(select(filter(x_y_rank, x_y == 0), incomplete))
 
 # 2.
 x_y_rank_m <-  melt(filter(x_y_rank, x_y != 0), id.vars = c('ASV', 'x_y'),
@@ -157,7 +178,6 @@ x_y_rank_m <-  melt(filter(x_y_rank, x_y != 0), id.vars = c('ASV', 'x_y'),
 
 x_y_rank_m$Rank <-  factor(x_y_rank_m$Rank, levels = TL[-1])
 
-levels <- c('full', 'sp')
 
 x_y_rank_m$DataBase <-  factor(x_y_rank_m$DataBase, levels = levels)
 
@@ -166,141 +186,126 @@ x_y_rank_m$DataBase <-  factor(x_y_rank_m$DataBase, levels = levels)
 
 ggplot(x_y_rank_m, 
        aes(y=..count.., x=abs(x_y), fill = DataBase)) + 
-  geom_histogram(aes(y=..count..), position=position_dodge(), alpha=0.5, bins = 30) +
+  geom_histogram(aes(y=..count..), position=position_dodge(), alpha=0.5, bins = 10) +
   #geom_density(alpha=.7) + 
   scale_x_continuous(name = "Change", breaks  =  c(1:6)) +
   scale_fill_brewer(palette = "Set1") +
   labs(x="change", y="Frequency of ASVs", 
        title = 'Level of Resolution between full and sp  BOLD dabases') +
-  facet_wrap( ~ Rank , scales = 'free_y')
+  facet_wrap( ~ Rank , scales = 'free_y') +
+theme_bw(base_size = 12)
 
 # and the zero across Ranks
     
 # alluvial
 
-alluv <- subset(x_y_rank, x_y != 0 & full != 'root')
-alluv <- db_color(alluv)
-
-# alluv <- subset(x_y_rank_m, x_y != 0 & Rank != 'root')
-# aggregate(alluv['DataBase'], by = list(alluv[,'Rank']), FUN = table)
-
+dim(alluv <- subset(x_y_rank, x_y != 0)) # 2635 ASVs with difference in assignation over databases
+alluv <- db_color(alluv) 
+table(alluv$Ref) # 1083 (complete) and 1552 (incomplete)
 
 # alluv <- alluv[alluv$ASV %in% sample(alluv$ASV, 20) ,]
-# alluv$x_y <- abs(alluv$x_y)
 
-levels <- c('full', 'sp')
+alluv$complete <-  factor(alluv$complete, levels = TL[-1])
+alluv$incomplete <-  factor(alluv$incomplete, levels = TL[-1]) 
 
-alluv$sp <-  factor(alluv$sp, levels = TL[-1])
-alluv$full <-  factor(alluv$full, levels = TL[-1]) 
-alluv$Ref <- factor(alluv$Ref, levels = levels) 
+alluv <- with(alluv, alluv[order(complete),])
+alluv <- select(alluv, complete, incomplete, Ref)
 
-alluv <- with(alluv, alluv[order(sp),])
+# RColorBrewer::brewer.pal(3, "Set1")
+
+scale <- c("incomplete"="#E41A1C",  "complete"="#377EB8")
 
 library(ggalluvial)
 
-is_alluvia_form(alluv, axes = 1:3, silent = TRUE)
+alluv_long <- to_lodes_form(data.frame(alluv), key = "x", axes = 1:2)
 
-# illustrate positioning
-ggplot(data = alluv,
-       aes(axis1 = sp, axis2 = full, color = Ref)) +
-  stat_stratum(geom = "errorbar") +
-  geom_line(stat = "alluvium") +
-  stat_alluvium(geom = "pointrange") +
-  scale_color_brewer(type = "qual", palette = "Set1") +
-  geom_text(stat = "stratum", label.strata = TRUE, color = 'black') +
-  scale_x_discrete(limits = c("sp", "full")) +
-  theme_minimal()
+# Sanity check
+colSums(aggregate(alluv_long['x'], by = list(alluv_long[,'stratum']), FUN = table)[,2]) == nrow(alluv)
+
+
+is_alluvia_form(alluv_long, silent = TRUE)
+
+ggplot(data = alluv_long,
+       aes(x = x, stratum = stratum, alluvium = alluvium,
+           label = stratum)) +
+  geom_alluvium(aes(fill = Ref)) +
+  geom_stratum() + geom_text(stat = "stratum") +
+  theme_minimal() + 
+  scale_fill_manual(values=scale) +
+  ggtitle("The frequency distribution over Ranks.") +
+  xlab("Database") + ylab("Number of ASVs")
+
+# https://github.com/corybrunson/ggalluvial/issues/13
+# For some strata appear at multiple aces warning messages
+
+# (Previous version)
+# ggplot(data = alluv,
+#        aes(axis1 = complete, axis2 = incomplete, color = Ref)) +
+#   stat_stratum(geom = "errorbar", na.rm = TRUE, alpha = 0.5) +
+#   geom_line(stat = "alluvium") +
+#   stat_alluvium(geom = "pointrange") +
+#   scale_color_manual(values=scale) +
+#   geom_text(stat = "stratum", label.strata = TRUE, color = 'black') +
+#   scale_x_discrete(limits = c("complete", "incomplete")) +
+#   theme_minimal()
 
 # 1) 
+
 
 scale <- c("Domain"="#edf8b1",  "Kingdom"="#7fcdbb", "Phylum"="#2c7fb8",  
            "Class"="#feb24c",  "Order"="#addd8e",  "Family"="#31a354",
            "Genus"="#bcbddc", "Species"="#756bb1")
 
-levels <- c('full', 'sp')
-alluv$Ref <- factor(alluv$Ref, levels = levels) 
+levels <- c('complete', 'incomplete')
+alluv_long$Ref <- factor(alluv_long$Ref, levels = levels) 
 
-ggplot(data = alluv,
-       aes(axis1 = sp, axis2 = full)) + 
-  geom_alluvium() + 
-  geom_stratum(na.rm = TRUE) + 
-  scale_x_discrete() +
-  geom_text(stat = "stratum", label.strata = TRUE, size = 3) +
-  scale_x_discrete(limits = c("sp", "full"), expand = c(.05, .05)) +
-  # theme(legend.position = "bottom") +
-  theme_minimal() + 
-  # use of lode controls
-  geom_flow(aes(fill = sp, alpha = Ref), stat = "alluvium",
+ggplot(data = alluv_long,
+       aes(x = x, stratum = stratum, alluvium = alluvium,
+           label = stratum)) +
+  geom_stratum() + geom_text(stat = "stratum") +
+  geom_flow(aes(fill = stratum, alpha = Ref), stat = "alluvium",
             aes.bind = FALSE, lode.guidance = "rightward") +
-            # color = "black",  linetype="dashed") +
-  scale_fill_manual(values=scale)
+  theme_minimal() + scale_fill_manual(values=scale) +
+  ggtitle("The frequency distribution over Ranks.") +
+  xlab("Database") + ylab("Number of ASVs")
+
+# (Previous version)
+# ggplot(data = alluv,
+#        aes(axis1 = complete, axis2 = incomplete)) + 
+#   geom_alluvium() + 
+#   geom_stratum(na.rm = TRUE) + 
+#   scale_x_discrete() +
+#   geom_text(stat = "stratum", label.strata = TRUE, size = 3) +
+#   scale_x_discrete(limits = c("complete", "incomplete"), expand = c(.05, .05)) +
+#   # theme(legend.position = "bottom") +
+#   theme_minimal() + 
+#   # use of lode controls
+#   geom_flow(aes(fill = complete, alpha = Ref), stat = "alluvium",
+#             aes.bind = FALSE, lode.guidance = "rightward") +
+#             # color = "black",  linetype="dashed") +
+#   scale_fill_manual(values=scale)
 
 # and 2
-levels <- c('sp', 'full')
 
-alluv$Ref <- factor(alluv$Ref, levels = levels) 
+levels <- c('incomplete', 'complete')
 
-ggplot(data = alluv,
-       aes(axis1 = sp, axis2 = full)) + 
-  geom_alluvium() + 
-  geom_stratum(show.legend = FALSE) + 
-  #scale_x_discrete() +
-  geom_text(stat = "stratum", label.strata = TRUE, size = 3) +
-  scale_x_discrete(limits = c("sp", "full"), expand = c(.05, .05)) +
-  # theme(legend.position = "bottom") +
-  theme_minimal() +
-  # use of lode controls
-  geom_flow(aes(fill = full, alpha = Ref), stat = "alluvium",
+alluv_long$Ref <- factor(alluv_long$Ref, levels = levels) 
+
+ggplot(data = alluv_long,
+       aes(x = x, stratum = stratum, alluvium = alluvium,
+           label = stratum)) +
+  geom_stratum() + geom_text(stat = "stratum") +
+  geom_flow(aes(fill = stratum, alpha = Ref), stat = "alluvium",
             aes.bind = FALSE, lode.guidance = "rightward") +
-  scale_fill_manual(values=scale)
-
-# library(RColorBrewer)
-# getPalette = colorRampPalette(brewer.pal(length(TL[-1]), "Spectral"))
+  theme_minimal() + scale_fill_manual(values=scale) +
+  ggtitle("The frequency distribution over Ranks.") +
+  xlab("Database") + ylab("Number of ASVs")
 
 # filtering rare assingation ----
 # Analsis 2 ----
+# siguiente script (bold_sp_full_F_G_S.R)
 
-# x <- x_y_rank[x_y_rank$x_y !=0, ]
-
-
-str(input_dat <- x_y_rank[x_y_rank$x_y !=0, c('ASV', 'sp','full')])
-# str(input_dat <- alluv[alluv$x_y !=0, c('ASV', 'sp','full')])
-
-x <- melt(input_dat, id.vars  = c('ASV'),
-          variable.name = 'DataBase',
-          value.name = 'Rank')
-
-x$Rank <- factor(x$Rank, levels = TL[-1])
-x$DataBase <- factor(x$DataBase, levels = levels)
-# insert filter to functio bbold
-
-# source(file = "~/Documents/GitHub/metagenomics/readtx.R")
-
-dim(out <- bbold(filter(x, Rank == TL[2:6]), fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = TRUE)) # 799 using x_y_rank instead of alluv
-# dim(out[out$abund > 1, ]) # remove singletones if non relative abundance
-
-ggplot(out, aes(seq_size, log(abund), color = abund)) +
-  geom_point(alpha = 0.7)
-
-summary(out$abund)
-# Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-# 0.000019 0.000180 0.000454 0.010729 0.001257 3.616235
-
-summary(out$seq_size)
-# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-# 273.0   313.0   313.0   312.3   313.0   319.0
-
-
-# remove singletones
-
-# vis2 <- select(out, paste("sp", TL2, sep="_"))
-# names(vis2) <- TL2            
-# 
-# ggplot(vis2, aes(axis1 = D, axis2 = K, axis3 = P, axis4 = C)) +
-#   geom_stratum(width = 1) + geom_text(stat = "stratum", label.strata = TRUE, size = 3) +
-#   scale_x_discrete(limits = c("Domain", "Kingdom", "Phylum", "Class"))
-
-# A) ventajas de la full
+# A) ventajas de la full (incomplete)
 # cuando se procesa la base de datos species se implementa el filtro en r complete.cases, 
 # ie. la celda debe contener valores distintos a NA; bold, contiene individuos con asignacion
 # hasta especie con 'gaps' entre los niveles taxonomicos, por lo que este tipo de asignaciones son
@@ -321,119 +326,7 @@ summary(out$seq_size)
 # EXISTEN NUEVOS INDIVIDUOS USANDO LA BASE DE DATOS FULL?
 # length(full_subset <- x[x$full == TL[2:6], 'ASV'])
 
-TL2 <- c("D", "K", "P", "C", "O", "F", "G", "S")
 
-apply(select(out, paste("full", TL2, sep="_")), 2, n_na)
-apply(select(out, paste("sp", TL2, sep="_")), 2, n_na)
-
-
-# HACER LO SIGUIENTE
-
-# 0. Select Phylum
-data0 <- rbind(
-  data.frame(table(out$sp_P), db = 'sp'),
-  data.frame(table(out$full_P), db = 'full')
-  
-)
-
-names(data0) <- c('lineage', 'Size', 'DataBase')
-data0$Rank <- 'Phylum'
-
-# 1. Select class
-data1 <- rbind(
-  data.frame(table(out$sp_C), db = 'sp'),
-  data.frame(table(out$full_C), db = 'full')
-  
-)
-
-names(data1) <- c('lineage', 'Size', 'DataBase')
-data1$Rank <- 'Class'
-
-# 2, Select Order
-
-data2 <- rbind(
-  data.frame(table(out$sp_O), db = 'sp'),
-  data.frame(table(out$full_O), db = 'full')
-  
-)
-
-names(data2) <- c('lineage', 'Size', 'DataBase')
-data2$Rank <- 'Order'
-
-# 3. Parse results
-ntaxa_data
-ntaxa_data <- rbind(data0,data1, data2)
-
-ntaxa_data$Rank <- factor(ntaxa_data$Rank, levels = TL[4:6])
-
-ntaxa_data <- ntaxa_data[order(-ntaxa_data$Size),]
-
-# aggregate colsums by 
-
-tax_sp <- select(out, abund, paste("sp", TL2, sep="_"))
-tax_full <- select(out, abund, paste("full", TL2, sep="_"))
-
-# Calculate abundance ----
-# coherence with data from ntaxa size
-# by phylum
-
-phylum <- rbind( data.frame(aglom_ab(tax_sp, 'sp_P'),
-           DataBase = 'sp',
-           Rank = 'Phylum'),
-       data.frame(aglom_ab(tax_full, 'full_P'),
-           DataBase = 'full',
-           Rank = 'Phylum'))
-# By Class
-Class <- rbind( data.frame(aglom_ab(tax_sp, 'sp_C'),
-                            DataBase = 'sp',
-                            Rank = 'Class'),
-                 data.frame(aglom_ab(tax_full, 'full_C'),
-                            DataBase = 'full',
-                            Rank = 'Class'))
-# By Order
-
-Order <- rbind( data.frame(aglom_ab(tax_sp, 'sp_O'),
-                            DataBase = 'sp',
-                            Rank = 'Order'),
-                 data.frame(aglom_ab(tax_full, 'full_O'),
-                            DataBase = 'full',
-                            Rank = 'Order'))
-# Plot aglomerated abundance ----
-
-abund_data <- rbind(phylum, Class, Order)
-abund_data$Rank <- factor(abund_data$Rank, levels = TL[4:6])
-abund_data <- abund_data[order(-abund_data$Size),]
-
-
-# merge ntaxa and abund
-ntaxa_data$abund <- 'ntaxa'
-abund_data$abund <- "nreads"
-
-data <- rbind(ntaxa_data, abund_data)
-data$abund <- factor(data$abund, levels = c('nreads', 'ntaxa'))
-
-ggplot(data,  aes(lineage, Size, fill = DataBase, group = DataBase)) +
-  geom_col(width = 0.4, position = position_dodge(), alpha = 0.7) +
-  scale_fill_brewer(palette = "Set1") + coord_flip() +
-  #geom_text(aes(label = Size), size = 3, position = position_dodge(width = 0.5)) +
-  facet_grid(Rank~ abund, scales = 'free') +
-  theme(axis.text=element_text(size=7)) +
-  labs(
-    title = 'Number of taxa during database assignation',
-    caption = paste0('Using the subset: filter(x, Rank == "Domain","Kingdom","Phylum","Class", "Order") \n Singletones removed'))
-
-# venn diagrams
-
-library(UpSetR)
-# https://cran.r-project.org/web/packages/UpSetR/vignettes/basic.usage.html
-
-movies <- read.csv(system.file("extdata", "movies.csv", package = "UpSetR"), 
-                   header = T, sep = ";")
-
-
-upset(movies, nsets = 6, number.angles = 30, point.size = 3.5, line.size = 2, 
-      mainbar.y.label = "Genre Intersections", sets.x.label = "Movies Per Genre", 
-      text.scale = c(1.3, 1.3, 1, 1, 2, 0.75))
 
 
 
