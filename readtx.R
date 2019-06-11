@@ -52,6 +52,39 @@ read_rdp <- function(taxonomy.file) {
   
 }
 
+
+# get boots ----
+# cat("\n 2. Bootstrap stats ... \n")
+boots_rdp <- function(taxonomy.file) {
+  
+  boots.obj <- read.csv(taxonomy.file, header=FALSE, sep="\t", stringsAsFactors=FALSE)
+  tax.split <- strsplit(boots.obj[, ncol(boots.obj)], ";")
+  max.rank <- max(lengths(tax.split)) # La funcion lengths esta en R v.3.5
+  
+  boots0 <- sapply(tax.split, "[", c(1:max.rank)) # Using the max rank assignation to names the taxonomy object
+  boots0 <- as.data.frame(t(boots0))
+  
+  boots <- as.data.frame(apply(taxonomy, 2, function(x) gsub("[A-z||()]", "",  x, perl=TRUE)), stringsAsFactors = F)
+  boots <- apply(boots, 2, as.numeric)
+  boots <- data.frame(boots)
+  boots.obj[which(is.na(boots$V9)), 2]
+  boots[is.na(boots)] <- 0
+  
+  rownames(boots) <- boots.obj[,1]
+  
+  return(boots)
+  
+  
+  # boots.backup <- boots
+  
+  # # Recorte de algun rank con asignacion root;
+  # boots <- boots[apply(boots, 2, mean) != 100]
+  # boots <- boots[apply(boots, 1, max) <= 100,] #remove rows redundant bootstrap
+  # boots <- boots[apply(boots, 1, min) > 0,] # ""
+  
+}
+
+
 # bold-sp vs bold-full ----
 # bbold(filter(x, full == TL[2:6]), fasta_file = fasta_file, count_tbl = count_tbl)
 bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = x_y_rank, rel_ab = TRUE) {

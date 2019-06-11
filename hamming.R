@@ -54,7 +54,7 @@ get_ham_nln <- function(unqs.in, band=16) {
 
 
 getAccuracy <- function(df) {
-  acc <- rep(is.character(NA), nrow(dfM))
+  acc <- rep(is.character(NA), nrow(df))
   acc[df$hit] <- "Exact"
   acc[df$oo] <- "One Off"
   acc[!df$oo & !df$hit] <- "Other"

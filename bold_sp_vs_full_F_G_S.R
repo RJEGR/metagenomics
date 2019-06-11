@@ -18,7 +18,6 @@ library(ggplot2)
 library(reshape2)
 library(dplyr)
 
-
 # Set filenames ----
 path_BOLD <- '/Users/cigom/metagenomics/COI/species_resolution_per_db'
 bold_all <- 'run014_t2_ASVs.ALL.wang.taxonomy'
@@ -525,15 +524,20 @@ length(lineage) # 20
 # track the list of asvs from databases (full, sp), and use sequences to analyse hamming distance or other
 # this task (or other) is neccesary to report false positive or false negative (also define this analysis thorug sanger mock68 )
 
+# start sequence analysis.
+
 dim(out0 <- bbold(test, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = x_y_rank,  rel_ab = FALSE)) # 142
 asv_subset <- out0$ASV
 length(asv_subset <- asv_subset[!duplicated(asv_subset)]) # 142
+
+# get ASV sequence from the analysis
 
 seqs0 <- readDNAStringSet(paste0(path_BOLD,'/',fasta_file))
 seqs <- seqs0[names(seqs0) %in% asv_subset]
 seqs <- seqs[match(asv_subset, names(seqs)),]
 
-# to rename, use last lineage assigned
+# process fasta file
+# to rename ids, use last lineage assigned
 
 x_ <- llineage(sp.taxa.obj)
 y_ <- llineage(full.taxa.obj)
@@ -550,7 +554,7 @@ if(identical(names(seqs), x_y_l_subset$ASV))
   save_fasta <- c(rbind(seqs_headers, as.data.frame(seqs)$x))
 }
 
-
+# save fasta
 file_name <- paste0(path_BOLD, "/", "non_shared_asvs.fasta")
 write(save_fasta, file=file_name)
 
@@ -650,7 +654,9 @@ head(alphabetFrequency(refSeqs0, baseOnly=TRUE))
 refSeqs <- data.frame(refSeqs0)$refSeqs0
 
 save(list = ls(all=TRUE), file = paste0(path_BOLD, "hamming.RData"))
-# load(paste0(path_BOLD, "hamming.RData"))
+
+
+load(paste0(path_BOLD, "hamming.RData"))
 # load function evalDist
 # source(file = "~/Documents/GitHub/metagenomics/hamming.R")
 dfM.vs.ref <- outer(dfM$sequence, refSeqs, evalDist, band=-1)
@@ -670,22 +676,19 @@ sum(dfM$refdist==0 & dfM$Ref == 'incomplete') # 2
 blast_file <- paste0(path_BOLD, '/', 'FJRA2ND7014-Alignment.txt')
 
 
-dfM$hit <- isHit100(dfM, blast_file)
-dfM$oo <- isOneOff(dfM, blast_file)
-
-# 1e-10
-get_ham_nln(data.frame(sequence=dfM$sequence[dfM$E_10>0], abundance=dfM$E_10[dfM$E_10>0]))
+dfM$hit <- isHit100(dfM, blast_file) # ie. identity == 100 & coverage == nchar(query sequence)
+dfM$oo <- isOneOff(dfM, blast_file) # table(dfM$oo)
 
 dfM$abund <- out0$abund
 dfM$seq_size = out0$seq_size
 
+# use nwhamming
 dfM$ham_nln <- as.integer(NA)
-
 dfM$ham_nln[dfM$abund>0] <- get_ham_nln(data.frame(sequence=dfM$sequence, abundance=dfM$abund[dfM$abund>0]))
 
 # define accuracy
 dfM$Accuracy <- getAccuracy(dfM)
-
+acc_tbl <- table(dfM$Accuracy[dfM$abund>0])
 
 # Visualize  -----
 
@@ -693,32 +696,177 @@ scl.y <- scale_y_log10(limits=c(10^-6, 10^-0.5))
 scl.x <- scale_x_log10(limits=c(1, 90))
 thm <- theme(plot.margin=rep(unit(0, "in"),4), panel.grid=element_blank(), legend.key=element_blank())
 accScale <- scale_shape_manual(name="Accuracy", values=c("Reference"=0, "Exact"=2, "One Off"=4, "Other"=8))
+colorScale <- scale_color_manual(values = scale )
 lab.x <- xlab("Hamming (Log-scale)")
-lab.y <- ylab("Frequency (Log-scale)")
+lab.y <- ylab("RA (log-scale)")
 
 #
-totM.ex <- sum(dfM$abund)
+totM.ab <- sum(dfM$abund)
 
-m1 <- ggplot(data=dfM[dfM$abund>0,], aes(x=ham_nln, y=ham_nln/totM.ex, shape=Accuracy))
-m1 <- m1 + geom_point(size=3)
-m1 <- m1 + accScale + theme_bw() + ggtitle("")
-m1 <- m1 + thm + lab.x + lab.y
-# m1 <- m1 + scl.y + scl.x + thm + lab.x + lab.y
-m1
+m1 <- ggplot(data=dfM[dfM$abund>0,], aes(x=ham_nln, y=-log(abund/totM.ab), shape=Accuracy, color = Ref, size = abund/totM.ab))
+m1 <- m1 + geom_point(alpha = 0.7) 
+m1 <- m1 + accScale + colorScale + theme_bw() + ggtitle("")
+#m1 <- m1 + thm + lab.x + lab.y
+m1 <- m1 + scl.y + scl.x + thm + lab.x + lab.y
+m1 +facet_free(~ Accuracy)
 
-acc_tbl <- table(dfM$Accuracy[dfM$abund>0])
+# 
+
+# check blast results.
+
+bb <- read.table(blast_file, comment.char="#", col.names=c("qseqid", "sseqid", "pident", "coverage", "mismatches", "gaps", "qstart", "qend", "sub_start", "sub_end", "e", "score"))
+nrow(bbHit100 <- bb[bb$pident == 100 & bb$coverage == nchar(dfM[match(bb$qseqid,dfM$id),"sequence"]),])
+
+bbHit100[,2] <- "BOLD reference"
+names(bbHit100)[c(1,2)] <- c("sseqid","qseqid")
+
+gg_bpout <- ggblast(blast_out = bbHit100, num_hit = nrow(bbHit100))
+
+library(gridExtra)
+
+do.call(grid.arrange, gg_bpout)
 
 
-xaScale <- scale_color_manual(name="Vs. ", values=c("Same"="black", "Added"="#0099FF", "Lost"="grey70"))
-dfM$xa <- "Same"
-dfM$xa[dfM$abund==0 & dfM$abund>0] <- "Added"
-dfM$xa[dfM$E_120>0 & dfM$E_10==0] <- "Lost"
-dfM$xa[dfM$E_120==0 & dfM$E_10==0] <- "N/A"
 
-m2 <- ggplot(data=dfM[dfM$abund>0 | dfM$abund>0,], aes(x=ham_nln, y=E_10/totM.ex, shape=Accuracy, color=xa))
-m2 <- m2 + geom_point(size=3)
-m2 <- m2 + geom_point(data=dfM[dfM$E_120>0 & dfM$E_10==0,], aes(x=E_120, y=E_120/totM.ex), size=2, show.legend=FALSE)
-m2 <- m2 + accScale + xaScale + theme_bw() + ggtitle("OMEGA 1E-120")
-m2 <- m2 + scl.y + scl.x + thm + lab.x + lab.y
-m2 <- m2 + geom_vline(xintercept=0.03*nchar(dfM$sequence[[1]]), linetype="dashed", color="grey25")
-m2
+ggblast <- function(blast_out, num_hit){
+  require(zoo)
+  require(RColorBrewer)
+  require(dplyr)
+  
+  pacman::p_load(RColorBrewer, zoo, dplyr, ggplot2)
+  
+  # Etiqueta de leyenda
+  vlab <- c(paste0(zoo::rollapply(c(0,seq(70,100,5)), width=2, by=1, 
+                                  function(x){paste(x, collapse = ":")}), "(-)"),
+            zoo::rollapply(c(0,seq(70,100,5)), width=2, by=1, 
+                           function(x){paste(x, collapse = ":")}))
+  # identity - Codigo de color
+  vcol <- c(brewer.pal(7, "Reds"), brewer.pal(7, "Blues"))
+  if(missing(num_hit)){ num_hit <- sum(blast_out$qseqid %in% x) }
+  # queryごとにplot -----
+  gg_blast <-
+    lapply(unique(blast_out$qseqid),
+           function(x){
+             # queryごとのデータフレーム
+             qdat <-blast_out %>%
+               # identityを離散値に変換
+               mutate(pident=as.integer(cut(pident, breaks=c(0,seq(70,100,5)), 1:7))) %>%
+               # hit position
+               mutate(pident=ifelse((qstart-qend) > 0, pident, pident+7)) %>%
+               # query selection
+               filter(qseqid==x) %>%
+               # top hitの数を指定
+               filter(row_number() %in% 
+                        1:ifelse(is.null(num_hit), sum(blast_out$qseqid %in% x), num_hit)) %>%
+               # identity, hitをfactorにして水準を逆に
+               mutate(pident=factor(pident, levels=rev(levels(factor(pident)))),
+                      sseqid=factor(sseqid, levels=rev(unique(sseqid))))
+             
+             # queryごとのカラーコードとレジェンドラベル
+             col_qdat <- vcol[as.integer(levels(factor(qdat$pident)))]
+             lab_qdat <- vlab[as.integer(levels(factor(qdat$pident)))]
+             
+             # 
+             ggplot(qdat, aes(x=qstart,xend=qend, y=sseqid, yend=sseqid, colour=pident)) +
+               theme_bw() + labs(title=x) +
+               geom_segment(size=3) +
+               scale_color_manual(values = col_qdat, name='Key of\nAligment\nScore', labels = lab_qdat) +
+               labs(title = paste0("Distribution of top ", num_hit, " blast hits")) + labs(x = 'Position in the reference', y = 'query sequence') +
+               theme_classic(base_size = 12) 
+           }
+    )
+  return(gg_blast)
+}
+
+
+# Determine ROC curves for full length CO1 barcode sequence i
+# dentified to various taxonomic ranks and a range of fragment lengths 
+# at the genus rank. Teresita P & Hajibabaei M. et al 2018
+# Receiver Operating Characteristic, 
+
+
+nrow(sp.boots.obj0 <- boots_rdp(paste0(path_BOLD,'/',bold_sp)))
+nrow(full.boots.obj0 <- boots_rdp(paste0(path_BOLD,'/',bold_all)))
+
+colnames(full.boots.obj0) <- TL
+colnames(sp.boots.obj0) <- TL
+
+# add sequence size
+length(seq_size  <- width(seqs0))
+# get sequence groups
+
+seq_group <- function(x, seq_size){
+  x <- cbind(x, seq_size)
+  
+  x$Group <- 300
+  x[x$seq_size < 300, 'Group'] <- 200 
+  x[x$seq_size < 200, 'Group'] <- 100
+  #x$Group <- factor(x$Group, levels = c("100", "200", "300"))
+  
+  return(x)
+}
+
+full.boots.obj0 <- seq_group(full.boots.obj0, seq_size)
+sp.boots.obj0 <- seq_group(sp.boots.obj0, seq_size)
+
+# get subset from 142 asvs excluted due to database composition
+
+nrow(sp.boots.obj <- sp.boots.obj0[rownames(sp.boots.obj0) %in% asv_subset, ])
+nrow(full.boots.obj <- full.boots.obj0[rownames(full.boots.obj0) %in% asv_subset, ])
+
+sp.boots.obj0 <- sp.boots.obj0[match(asv_subset, rownames(sp.boots.obj0)),]
+full.boots.obj0 <- full.boots.obj0[match(asv_subset, rownames(full.boots.obj0)),]
+
+sp.boots.obj0$Ref <- 'complete'
+full.boots.obj0$Ref <- 'incomplete'
+
+databoots <- rbind(sp.boots.obj0, full.boots.obj0)
+
+# if mean of boots
+# apply(x, 1, mean)
+
+p <- ggplot(melt(select(databoots, -seq_size, -Group)), aes(x=variable, y=log10(value), color = Ref)) + 
+  geom_boxplot()
+
+p + geom_jitter(shape=16, position=position_jitter(0.2), alpha = 0.5) +
+  scale_color_manual(values = scale)
+
+# A ROC curve show the relationship between the false positive Rate (FDR) and the true positive rate (TPR) 
+# as the bootstrap support cutoff is tuned from 0 to 100%
+# The FPR represent the proportion of incorrect assigments with a high bootstrap support value out of all incorrect assigments.
+# The TPR represents the proportion of correct assigments with a high bootstrap support value out of all corret assigments
+
+plot(sp.boots.obj0$Species, sp.boots.obj0$seq_size)
+
+rank_roc <- sp.boots.obj0$Order
+group_roc <- sp.boots.obj0$seq_size
+
+## fit a logistic regression to the data...
+glm.fit <- glm(group_roc ~ rank_roc) # family = 
+
+lines(rank_roc, glm.fit$fitted.values)
+
+## We can also change the color of the ROC line, and make it wider...
+roc(group_roc, glm.fit$fitted.values, plot=TRUE, legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
+
+
+# roc(group_roc, glm.fit$fitted.values, plot=TRUE, levels = c("100","300"), legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
+# roc(group_roc, glm.fit$fitted.values, plot=TRUE, levels = c("200","300"), legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
+
+# multiclass.roc(group_roc, glm.fit$fitted.values, plot=TRUE)
+par(pty = "s")
+
+## and then extract just the information that we want from that variable.
+roc.df <- data.frame(
+  tpp=roc.info$sensitivities*100, ## tpp = true positive percentage
+  fpp=(1 - roc.info$specificities)*100, ## fpp = false positive precentage
+  thresholds=roc.info$thresholds)
+
+## now let's look at the thresholds between TPP 60% and 80%
+roc.df[roc.df$tpp > 60 & roc.df$tpp < 80,]
+
+# and random forest model
+
+rf.model <- randomForest(factor(group_roc, levels = c("100", "200", "300")) ~ rank_roc)
+roc(rank_roc, rf.model$votes[,1], plot=TRUE, legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#4daf4a", lwd=4, print.auc=TRUE)
+
