@@ -19,12 +19,16 @@ library(reshape2)
 library(dplyr)
 
 # Set filenames ----
+
 path_BOLD <- '/Users/cigom/metagenomics/COI/species_resolution_per_db'
 bold_all <- 'run014_t2_ASVs.ALL.wang.taxonomy'
 bold_sp <- 'run014_t2_ASVs.BOLD_public_species.wang.taxonomy'
 fasta_file <- 'run014_t2_ASVs.fasta'
 count_tbl <- 'run014_t2_ASVs_count.table'
+
 # Load files ----
+
+setwd(path_BOLD)
 
 full.taxa.obj <- read_rdp(paste0(path_BOLD,'/',bold_all))
 sp.taxa.obj <- read_rdp(paste0(path_BOLD,'/',bold_sp))
@@ -99,6 +103,7 @@ dim(out <- rbind(data.frame(Dom_o, Rank = TL[2]),
 
 out$Rank <- factor(out$Rank, levels = TL[-1])
 out$Ref <- factor(out$Ref, levels = levels)
+
 # out <- rank_n(out)
 
 # And remove duplicates:
@@ -108,6 +113,7 @@ out$Ref <- factor(out$Ref, levels = levels)
 
 # Ex.
 head(out$ASV[which(table(out$ASV) >= 2)])
+
 tt <- out[out$ASV == 'ASV_17358', c('ASV', 'Ref','Rank')]
 tt[!duplicated(tt$ASV, fromLast = TRUE) ,]
 
@@ -186,7 +192,7 @@ sum(equals$abund) + sum(out$abund)  == 100
 equals_sbt <- select(equals, ASV, Ref, Rank, abund, seq_size)
 equals_sbt$Ref <- "Both"
 
-nrow(seq_size_vs_abund <- rbind(equals_sbt, select(out, ASV, Ref, Rank, abund, seq_size))) # 20251 ASVs
+nrow(seq_size_vs_abund <- rbind(equals_sbt, select(out, ASV, Ref, Rank, abund, seq_size))) # 21278 ASVs
 
 # sanity check
 nrow(full.taxa.obj) == nrow(sp.taxa.obj) #TRUE
@@ -203,9 +209,8 @@ nrow(out) + nrow(equals) == nrow(sp.taxa.obj)
 # dim(missed_sbt <- missed_sbt[!duplicated(missed_sbt$ASV, fromLast = TRUE) ,])
 
 # compare 
-ggplot(seq_size_vs_abund, aes(seq_size, -log(abund), color = Rank)) +
+ggplot(seq_size_vs_abund, aes(seq_size , -log(abund), color = Rank, shape = Rank)) +
   geom_point(alpha = 0.5, aes(size = abund)) + theme_bw(base_size = 12) + 
-  scale_color_manual(scale = scale) +
   facet_wrap( ~ Ref) +
   scale_color_manual(values=scale2) + coord_flip() +
   labs(caption = paste0("Here's present a set of ", nrow(out), " and ", nrow(equals), " different ASVs assigned to R rank level due to sequence resolution [x_y != 0] and [x_y == 0], respectively\n",
@@ -220,7 +225,7 @@ test0 <- select(test0, ASV, Ref, Rank, lineage)
 test1 <- melt(equals, id.vars = c('ASV', 'seq_size', 'abund', 'x_y','Ref', 'Rank'), variable.name = 'DataBase', value.name = 'lineage')
 test1 <- select(test1, ASV, Ref, Rank, lineage)
 
-nrow(test1 <- test1[!duplicated(test1$lineage),]) # 1130 unique lineage 
+nrow(test1 <- test1[!duplicated(test1$lineage),]) # 142 unique lineage 
 
 # test1$DataBase <- factor(test1$DataBase, levels = paste("sp", TL2[4:9], sep="_"))
 
@@ -234,9 +239,7 @@ test0 %>%
   as.data.frame() -> test
 
 
-head(test$ASV[which(table(test$ASV) >= 3)])
-tt <- x[x$ASV == 'ASV_8000',]
-tt[!duplicated(tt$ASV, fromLast = TRUE) ,]
+
 
 dim(test <- test[!duplicated(test$ASV, fromLast = TRUE),]) # 142
 
@@ -280,8 +283,8 @@ colSums(aggregate(test[,'Ref'], by=list(test[,'Rank']), FUN = table)[2])
 #       mainbar.y.label = "Genre Intersections", sets.x.label = "Movies Per Genre", 
 #       text.scale = c(1.3, 1.3, 1, 1, 2, 0.75))
 
-dim(out0_c <- bbold(filter(test, Ref == 'complete'), fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = x_y_rank,  rel_ab = TRUE)) # 142
-dim(out0_i <- bbold(filter(test, Ref == 'incomplete'), fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = x_y_rank,  rel_ab = TRUE)) # 142
+dim(out0_c <- bbold(filter(test, Ref == 'complete'), fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = x_y_rank,  rel_ab = TRUE)) # 47
+dim(out0_i <- bbold(filter(test, Ref == 'incomplete'), fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = x_y_rank,  rel_ab = TRUE)) # 95
 
 #round(sum(out0$abund), digits = 2)  # 1.26 % of reads
 round(sum(out0_c$abund), digits = 2)  # 0.37 % of reads
@@ -316,6 +319,7 @@ data1 <- rbind(
   data.frame(table(out0_i$incomplete_F), db = 'incomplete')
   
 )
+
 # 1. Select Genus
 data2 <- rbind(
   data.frame(table(out0_c$complete_G), db = 'complete'),
@@ -779,8 +783,8 @@ ggblast <- function(blast_out, num_hit){
 }
 
 
-# Determine ROC curves for full length CO1 barcode sequence i
-# dentified to various taxonomic ranks and a range of fragment lengths 
+# Determine ROC curves for full length CO1 barcode sequence 
+# identified to various taxonomic ranks and a range of fragment lengths 
 # at the genus rank. Teresita P & Hajibabaei M. et al 2018
 # Receiver Operating Characteristic, 
 
@@ -809,18 +813,18 @@ seq_group <- function(x, seq_size){
 full.boots.obj0 <- seq_group(full.boots.obj0, seq_size)
 sp.boots.obj0 <- seq_group(sp.boots.obj0, seq_size)
 
+sp.boots.obj0$Ref <- 'complete'
+full.boots.obj0$Ref <- 'incomplete'
+
 # get subset from 142 asvs excluted due to database composition
 
 nrow(sp.boots.obj <- sp.boots.obj0[rownames(sp.boots.obj0) %in% asv_subset, ])
 nrow(full.boots.obj <- full.boots.obj0[rownames(full.boots.obj0) %in% asv_subset, ])
 
-sp.boots.obj0 <- sp.boots.obj0[match(asv_subset, rownames(sp.boots.obj0)),]
-full.boots.obj0 <- full.boots.obj0[match(asv_subset, rownames(full.boots.obj0)),]
+sp.boots.obj <- sp.boots.obj[match(asv_subset, rownames(sp.boots.obj)),]
+full.boots.obj <- full.boots.obj[match(asv_subset, rownames(full.boots.obj)),]
 
-sp.boots.obj0$Ref <- 'complete'
-full.boots.obj0$Ref <- 'incomplete'
-
-databoots <- rbind(sp.boots.obj0, full.boots.obj0)
+nrow(databoots <- rbind(sp.boots.obj, full.boots.obj))
 
 # if mean of boots
 # apply(x, 1, mean)
@@ -831,30 +835,38 @@ p <- ggplot(melt(select(databoots, -seq_size, -Group)), aes(x=variable, y=log10(
 p + geom_jitter(shape=16, position=position_jitter(0.2), alpha = 0.5) +
   scale_color_manual(values = scale)
 
-# A ROC curve show the relationship between the false positive Rate (FDR) and the true positive rate (TPR) 
-# as the bootstrap support cutoff is tuned from 0 to 100%
+
+# True positive Rate (TPR)
+# False positive Rate (FPR)
+
 # The FPR represent the proportion of incorrect assigments with a high bootstrap support value out of all incorrect assigments.
 # The TPR represents the proportion of correct assigments with a high bootstrap support value out of all corret assigments
 
-plot(sp.boots.obj0$Species, sp.boots.obj0$seq_size)
+# A ROC curve show the relationship between the false positive Rate (FDR) and the true positive rate (TPR) 
+# as the bootstrap support cutoff is tuned from 0 to 100%
 
-rank_roc <- sp.boots.obj0$Order
-group_roc <- sp.boots.obj0$seq_size
+nrow(subset_tbl <- filter(sp.boots.obj0, Group == '200'))
+
+#plot(subset_tbl$Species, subset_tbl$seq_size)
+
+length(rank_roc <- subset_tbl$Species)
+length(group_roc <- subset_tbl$seq_size)
 
 ## fit a logistic regression to the data...
 glm.fit <- glm(group_roc ~ rank_roc) # family = 
 
-lines(rank_roc, glm.fit$fitted.values)
+# lines(rank_roc, glm.fit$fitted.values)
 
 ## We can also change the color of the ROC line, and make it wider...
-roc(group_roc, glm.fit$fitted.values, plot=TRUE, legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
-
+# roc(group_roc, glm.fit$fitted.values, plot=TRUE, legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
+# par(pty = "s")
+multiclass.roc(group_roc, glm.fit$fitted.values, plot=TRUE, legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
 
 # roc(group_roc, glm.fit$fitted.values, plot=TRUE, levels = c("100","300"), legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
 # roc(group_roc, glm.fit$fitted.values, plot=TRUE, levels = c("200","300"), legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
 
 # multiclass.roc(group_roc, glm.fit$fitted.values, plot=TRUE)
-par(pty = "s")
+# 
 
 ## and then extract just the information that we want from that variable.
 roc.df <- data.frame(
@@ -862,11 +874,31 @@ roc.df <- data.frame(
   fpp=(1 - roc.info$specificities)*100, ## fpp = false positive precentage
   thresholds=roc.info$thresholds)
 
+
+ggplot(roc.df, aes(y = tpp, x = fpp)) +
+  geom_path(size=1, alpha=0.6, linetype=1, position =  "identity")
+  
 ## now let's look at the thresholds between TPP 60% and 80%
 roc.df[roc.df$tpp > 60 & roc.df$tpp < 80,]
 
-# and random forest model
+#######################################
+##
+## Now let's fit the data with a random forest...
+##
+#######################################
+rf.model <- randomForest(factor(obese) ~ weight)
 
-rf.model <- randomForest(factor(group_roc, levels = c("100", "200", "300")) ~ rank_roc)
-roc(rank_roc, rf.model$votes[,1], plot=TRUE, legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#4daf4a", lwd=4, print.auc=TRUE)
+## ROC for random forest
+roc(obese, rf.model$votes[,1], plot=TRUE, legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#4daf4a", lwd=4, print.auc=TRUE)
+
+#######################################
+##
+## Now layer logistic regression and random forest ROC graphs..
+##
+#######################################
+roc(obese, glm.fit$fitted.values, plot=TRUE, legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
+
+plot.roc(obese, rf.model$votes[,1], percent=TRUE, col="#4daf4a", lwd=4, print.auc=TRUE, add=TRUE, print.auc.y=40)
+
+legend("bottomright", legend=c("Logisitic Regression", "Random Forest"), col=c("#377eb8", "#4daf4a"), lwd=4)
 

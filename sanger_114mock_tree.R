@@ -13,6 +13,12 @@ rm(list = ls())
 args = commandArgs(trailingOnly=TRUE)
 
 path <- '/Users/cigom/metagenomics/COI/run012/mock_P68/mock_parameter_definition'
+# path_files <- '/Users/cigom/metagenomics/sanger_assign_db/'
+# fasta.file <- paste0(path_files, 'OMEGA_A_1e_120_ASVs.fasta')
+# out_prefix <- 'OMEGA_A_1e_120_ASVs'
+
+# bold_sp <- 'OMEGA_A_1e_120_ASVs.BOLD_public_species.wang.taxonomy'
+# taxonomy.file <- paste0(path_files, bold_sp)
 setwd(path)
 # file.name <- args[1]
 fasta.file <- 'ictio_coi_sanger114.fasta'
@@ -51,6 +57,7 @@ sapply(c(.cran_packages, .bioc_packages), require, character.only = TRUE)
 # Outputs in `pwd`:
 # ================
 dir = getwd()
+# dir = path_files
 out_path <- file.path(dir, "")
 system(command = paste0("mkdir -p ", out_path), intern = F)
 
@@ -123,6 +130,7 @@ taxonomy <- sapply(tax.split, "[", c(1:max.rank)) # Using the max rank assignati
 taxonomy <- as.data.frame(t(taxonomy))
 rownames(taxonomy) <- taxonomy.obj[,1]
 tax <- as.data.frame(apply(taxonomy, 2, function(x) gsub("\\(.*$", "",  x, perl=TRUE)), stringsAsFactors = F)
+tax <- mutate_all(data.frame(tax), funs(str_replace_all(., c("_unclassified"="", "Unclassified"="", "_"=" "))))
 
 
 rank.names <- vector(max.rank, mode="character")
@@ -132,7 +140,9 @@ for (i in 1:max.rank) {
 }
 
 rank.names <- c("Reino", "Filo", "Clase", "Orden", "Familia", "Genero", "Especie")
+# rank.names <- c("root","Domain","Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
 colnames(tax) <- rank.names
+rownames(tax) <- taxonomy.obj$V1
 
 tax <- as_tibble(data.frame(label = rownames(tax), tax, row.names =  NULL))
 
@@ -146,23 +156,32 @@ data.frame(taxa=apply(tax, 2, function(x) length(table(x)) ))
 tbl <- as_tibble(read.csv("/Users/cigom/metagenomics/COI/X04_SangerIctio/ListaPool114_sanger.csv", sep=",", stringsAsFactors = FALSE, header=TRUE))
 
 names(tbl)[1] <- "label"
+names(tbl)[3] <- "Species"
 
 library(ggplot2)
 library(RColorBrewer)
 
+tree$tip.label <- names_seqs
+
 x <- as_data_frame(tree)
+
+x$label <- names_seqs
 
 x %>% full_join(tbl, by = 'label') %>%
       full_join(tax, by = 'label') -> y
+
+x %>% 
+  full_join(tax, by = 'label') %>%
+  anti_join(tbl, by = 'Species') -> y
 
 tree <- NULL
 tree <- y %>% tidytree::as.treedata()
 
 # y %>% filter(!is.na(y[,rank.names[7]])) 
-colourCount = nrow(unique(y[,rank.names[4]]))
+colourCount = nrow(unique(y[,'Order']))
 getPalette = colorRampPalette(brewer.pal(colourCount, "Paired"))
 
-plot <- ggtree(tree, branch.length='none', layout='slanted', aes(color=Rank_4,  na.rm = TRUE), size=1) +
+plot <- ggtree(tree, branch.length='none', layout='slanted', aes(color=Order,  na.rm = TRUE), size=1) +
   theme(legend.position="top") +
   scale_color_manual(values = c(getPalette(colourCount)), na.value = "grey", guide = guide_legend(ncol=round(colourCount / 3))) +
   #geom_tiplab(size=4, aes(label=paste0('italic(', label, ')~bolditalic(', Query.ID, ')~', Best.ID)), parse=FALSE)
@@ -210,13 +229,6 @@ ggtree(tree) +
   geom_hilight(node=c(116, 122), fill="darkgreen", alpha=.6) +
   geom_hilight(node=c(137,118), fill="steelblue", alpha=.6)
 
-
-# plot alluvial , require(ggalluvial)
-
-ggplot(data = tax,
-       aes(axis1 = Filo, axis2 = Clase, axis3 = Orden, axis4 = Familia, axis5 = Genero, axis6 = Especie)) +
-       scale_x_discrete(limits = rank.names[-1],  expand = c(.1, .05)) +
-       geom_alluvium(aes(fill = Orden))
            
 
 

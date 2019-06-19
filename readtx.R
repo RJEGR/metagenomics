@@ -95,7 +95,7 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = 
   db_subset <- x[!duplicated(x)]
   # 1) abundance ----
   
-  count.tbl0 <- read.table(paste0(path_BOLD, "/",count_tbl))
+  count.tbl0 <- read.table(count_tbl, row.names = 1)
   total <- sum(rowSums(count.tbl0))
   nreads <- rowSums(count.tbl0)
   
@@ -115,7 +115,7 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = 
   
   if(identical(rownames(rabund0), db_subset)) {
     
-    count.tbl <- data.frame(ASV = rownames(count.tbl0[rownames(count.tbl0) %in% db_subset, ]),
+    count.tbl <- data.frame(ASV = rownames(count.tbl0)[which(rownames(count.tbl0) %in% db_subset)],
                             abund = rabund0$rabund)
     count.tbl <- count.tbl[match(db_subset, count.tbl$ASV),]
     }
@@ -124,7 +124,7 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = 
   if (identical(as.character(count.tbl$ASV), db_subset) != TRUE) stop('... The order in the count.tbl is distinct than present subset and is needed... Stopping. 1');
   
   # 2) sequence size ----
-  seqs0 <- readDNAStringSet(paste0(path_BOLD,'/',fasta_file))
+  seqs0 <- readDNAStringSet(fasta_file)
   seqs <- seqs0[names(seqs0) %in% db_subset]
   seqs <- seqs[match(db_subset, names(seqs)),]
 
@@ -264,4 +264,71 @@ rank_n <- function(x) {
   out$Rank_n <- as.numeric(out$Rank_n)
   out <- out %>% group_by(ASV)
   return(out)
+}
+
+
+# bbold single version
+
+bbold_ <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = TRUE) {
+  
+  require(Biostrings)
+  
+  x <- y$ASV
+  db_subset <- x[!duplicated(x)]
+  # 1) abundance ----
+  
+  count.tbl0 <- read.table(count_tbl)
+  total <- sum(rowSums(count.tbl0))
+  nreads <- rowSums(count.tbl0)
+  
+  # count.tbl <- data.frame(ASV = rownames(count.tbl0[rownames(count.tbl0) %in% db_subset, ]),
+  #                         abund = rowSums(count.tbl0[rownames(count.tbl0) %in% db_subset, ]))
+  
+  if(rel_ab) {
+    rabund <- data.frame(ASV = names(nreads), rabund = (nreads / total) * 100)
+    
+    rabund0 <- rabund[rabund$ASV %in% db_subset, ]
+    rabund0 <- rabund0[match(db_subset, rownames(rabund0)),] 
+  } else {
+    rabund0 <- data.frame(ASV = names(nreads), rabund = nreads)
+    rabund0 <- rabund0[match(db_subset, rownames(rabund0)),] 
+    
+  }
+  
+  if(identical(rownames(rabund0), db_subset)) {
+    
+    count.tbl <- data.frame(ASV = rownames(count.tbl0)[which(rownames(count.tbl0) %in% db_subset)],
+                            abund = rabund0$rabund)
+    count.tbl <- count.tbl[match(db_subset, count.tbl$ASV),]
+  }
+  
+  # sanity check
+  if (identical(as.character(count.tbl$ASV), db_subset) != TRUE) stop('... The order in the count.tbl is distinct than present subset and is needed... Stopping. 1');
+  
+  # 2) sequence size ----
+  seqs0 <- readDNAStringSet(fasta_file)
+  seqs <- seqs0[names(seqs0) %in% db_subset]
+  seqs <- seqs[match(db_subset, names(seqs)),]
+  
+  # sanity check
+  if (identical(names(seqs), db_subset) == FALSE) stop('... Stopping. 2');
+  
+  # 3) taxonomy db distribution ----
+  
+  # parse data.frame ----
+  
+  seqs <- seqs[match(db_subset, names(seqs)),]
+  #count.tbl <- count.tbl[match(db_subset, count.tbl$ASV),]
+  
+  
+  if(identical(names(seqs), as.character(count.tbl$ASV))) {
+    out <- data.frame(ASV = names(seqs),
+                      seq_size = width(seqs),
+                      abund = count.tbl$abund,
+                      select(tax, -ASV),
+                      stringsAsFactors = FALSE)
+  }
+  
+   return(out)
+  
 }
