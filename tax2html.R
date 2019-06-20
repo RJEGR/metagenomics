@@ -7,6 +7,7 @@
 rm(list = ls())
 
 args = commandArgs(trailingOnly=TRUE)
+options(stringsAsFactors = FALSE)
 
 wang.taxonomy <- args[1]
 count_tbl <- args[2]
@@ -22,7 +23,7 @@ fasta_file <- 'run014_t2_ASVs.fasta'
 
 boldid_ <- function(x) {
   require(taxize)
-  boldid <- get_boldid(x, verbose = FALSE)
+  boldid <- get_boldid(x, verbose = FALSE, check = FALSE)
   id <- paste0('<a href=', attributes(boldid)$uri, '>', boldid[1], '</a>')
   return(id)
 }
@@ -40,9 +41,9 @@ boldid_2 <- function(x) {
 
 # Path ----
 
-path <- getwd()
+# path <- getwd()
 
-# path <- '/Users/cigom/metagenomics/COI/species_resolution_per_db'
+path <- '/Users/cigom/metagenomics/COI/species_resolution_per_db'
 
 # Load files ----
 
@@ -133,12 +134,12 @@ quit(save = "no")
 
 # YOU CAN ALSO SUMMARY LINEAGE ITH NUMBER OF ASVS WITH THIS DISPOSAL
 
-
 tax <- data.frame(ASV = rownames(tax), tax)
 
-out0 <- bbold_(tax, fasta_file = fasta_file, count_tbl = count_tbl,  rel_ab = FALSE)
+out0 <- bbold_(tax, fasta.file, count.file,  rel_ab = FALSE)
 
-nrow(rank_out <- data.frame(aglom_ab(out0, 'Order')))
+
+str(rank_out <- data.frame(aglom_ab(out0, 'Species')))
 
 
 boldid_3 <- function(x) {
@@ -149,7 +150,42 @@ boldid_3 <- function(x) {
   return(x_)
 }
 
-bold3_tax <- boldid_3(head(rank_out))
-out_tbl <- data.frame(head(rank_out), boldid = bold3_tax)
+# connect to a secured network (or error with Web authent)
 
-# reply the widget part one more time
+boldid_(rank_out$lineage[2])
+
+
+bold3_tax <- boldid_3(rank_out) # time demand!
+out_tbl <- data.frame(rank_out, boldid = bold3_tax)
+
+# or apply
+
+tax_out <- lapply(rank_out$lineage[1:3], boldid_)
+out_tbl <- data.frame(rank_out[1:3,], boldid = tax_out)
+
+# then,
+
+require(DT)
+
+widget <- datatable(
+  out_tbl, 
+  escape=1,
+  extensions = 'Buttons', options = list(
+    pageLength = 25,  
+    dom = 'Bfrtip',
+    buttons = 
+      list('copy', 'print', list(
+        extend = 'collection',
+        buttons = c('csv', 'excel'),
+        text = 'Download'
+      ))
+    
+  )
+)
+
+htmlwidgets::saveWidget(widget, paste0(tax.file, ".html"))
+
+cat("\nDataTable conversion was done:", wang.taxonomy,"\n")
+
+quit(save = "no")
+

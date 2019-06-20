@@ -229,9 +229,20 @@ ggtree(tree) +
   geom_hilight(node=c(116, 122), fill="darkgreen", alpha=.6) +
   geom_hilight(node=c(137,118), fill="steelblue", alpha=.6)
 
-           
 
-
+quit()
+# install.packages('phytools')
+# library(phytools)
+# https://lebeagle.qcbs.ca/post/172412130928/r-toolbox-how-to-plot-a-phylogeny-using-phytools
+# library(ape)
+# 
+# tree2<- as.phylo(tree)
+# plot.phylo(tree2)
+# 
+# data(bird.orders)
+# plot.phylo(bird.orders, edge.width = 1, label.offset = 1,cex = 0.4, main = "Figure 1 (basic)")
+# 
+# 
 
 
 

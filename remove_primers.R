@@ -11,9 +11,17 @@ packageVersion("PrimerMiner")
 
 
 FWD <- "GGWACWGGWTGAACWGTWTAYCCYCC"  ## FORWARD &
-REV <- "TAIACYTCIGGRTGICCRAARAAYCA"  ## REVERSE (inosina to N)
+REV <- "TANACYTCNGGRTGNCCRAARAAYCA"  ## REVERSE (inosina to N)
+# REV <- "TAIACYTCIGGRTGICCRAARAAYCA"  ## REVERSE (inosina to N)
 
-fasta.file <- 'damisela_Ncyanomos_coi_short.fasta'
+pathwd <- 'metagenomics/COI/run012/Ncyanomos/'
+fasta.file <- paste0(pathwd, 'damisela_Ncyanomos_coi_short.fasta')
+
+seqs <- readDNAStringSet(fasta.file)
+seqs.width <- width(seqs)
+names_seqs <- names(seqs)
+names(seqs) <- seqs # This propagates to the tip labels of the tree
+
 
 allOrients <- function(primer) {
     # Create all orientations of the input sequence
@@ -36,22 +44,24 @@ primerHits <- function(primer, seqs) {
     return(sum(nhits > 0))
 }
 # Sanity check
-rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, seqs = seqs), 
-    FWD.ReverseReads = sapply(FWD.orients, primerHits, seqs = seqs), 
-    REV.ForwardReads = sapply(REV.orients, primerHits, seqs = seqs), 
-    REV.ReverseReads = sapply(REV.orients, primerHits, seqs = seqs))
-
+rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, seqs = fasta.file), 
+    FWD.ReverseReads = sapply(FWD.orients, primerHits, seqs = fasta.file), 
+    REV.ForwardReads = sapply(REV.orients, primerHits, seqs = fasta.file), 
+    REV.ReverseReads = sapply(REV.orients, primerHits, seqs = fasta.file))
 # 
-seqs <- readDNAStringSet(fasta.file)
-seqs.width <- width(seqs)
-names_seqs <- names(seqs)
-names(seqs) <- seqs # This propagates to the tip labels of the tree
-
 alignment <- DECIPHER::AlignSeqs(DNAStringSet(seqs), anchor=NA)
 
-asv_fasta <- c(rbind(asv_headers, asv_seqs))
+out_align <- data.frame(alignment)
 
-writePairwiseAlignments(alignment, file="damisela_Ncyanomos_coi_short.align", Matrix=NA, block.width=50)
+names(alignment) <- names_seqs
+
+out_fasta <- c(rbind(paste0(">", names_seqs), out_align$alignment))
+
+write(out_fasta)
+file_name <- paste0(pathwd, "damisela_Ncyanomos_coi_short.align")
+write(out_fasta, file=file_name)
+
+# writePairwiseAlignments(alignment, file=paste0(pathwd, "damisela_Ncyanomos_coi_short.align"), Matrix=NA, block.width=50)
 # clustering <- PrimerMiner::Clustering(fasta.file, vsearchpath = "Vsearch", id = 0.97, cmd = "" ,threshold = "Majority") # hay error en in file (con, 'r')
 # Vsearch  -derep_fulllength damisela_Ncyanomos_coi_short.fasta -output /damisela_Ncyanomos_coi_short_drep.fasta
 

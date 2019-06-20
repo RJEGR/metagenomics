@@ -238,7 +238,7 @@ llineage <- function(x) {
 }
 
 # additional step to bbold ---
-bbold_ <- function(x, x_y_rank) {
+bbold_old <- function(x, x_y_rank) {
   x %>%
     group_by(ASV) %>%
     inner_join(x_y_rank, by = 'ASV') %>%
@@ -274,16 +274,13 @@ bbold_ <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = T
   require(Biostrings)
   
   x <- y$ASV
-  db_subset <- x[!duplicated(x)]
+  db_subset <- as.character(x[!duplicated(x)])
   # 1) abundance ----
   
   count.tbl0 <- read.table(count_tbl)
   total <- sum(rowSums(count.tbl0))
   nreads <- rowSums(count.tbl0)
-  
-  # count.tbl <- data.frame(ASV = rownames(count.tbl0[rownames(count.tbl0) %in% db_subset, ]),
-  #                         abund = rowSums(count.tbl0[rownames(count.tbl0) %in% db_subset, ]))
-  
+
   if(rel_ab) {
     rabund <- data.frame(ASV = names(nreads), rabund = (nreads / total) * 100)
     

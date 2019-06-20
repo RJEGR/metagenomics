@@ -13,13 +13,15 @@ sl_back <- function(x) {
   return(x_)
 }
 
+
 mrank <- function(x) {
   x_ <- NULL
   for (i in 1:nrow(x)) {
     rl <- x$SL[i] + 1
-    # x_[[i]] <- list(rank=names(x)[rl], linage=x[i,rl]) }
+    #x_[[i]] <- list(rank=names(x)[rl], linage=x[i,rl])
     x_[[i]] <- names(x)[rl]
   }
+  return(x_)
 }
 
 source(file = "~/Documents/GitHub/metagenomics/readtx.R")
@@ -91,32 +93,29 @@ ggplot(SL_aggM, aes(x=Rank, y=value, group=variable, fill=variable, color=variab
 
 # Prepare alluvial ----
 # .... 1
-x_ <- NULL
-for (i in 1:nrow(sp.taxa.obj)) {
-  rl <- sp.taxa.obj$SL[i] + 1
-  x_[[i]] <- names(full.taxa.obj)[rl]
-}
 
-# 2.
-y_ <- NULL
-for (i in 1:nrow(full.taxa.obj)) {
-  rl <- full.taxa.obj$SL[i] + 1
-  y_[[i]] <- names(full.taxa.obj)[rl]
-}
+
+
+head(mrank(bold_full))
+data.frame(full = mrank(bold_full)
+
 
 
 
 # 1.
-x_y_rank <- data.frame(ASV = rownames(sp.taxa.obj), 
-                       sp= x_, full= y_, 
-                       #SL_x = sp.taxa.obj$SL,
-                       #SL_y = full.taxa.obj$SL,
-                       x_y = sp.taxa.obj$SL - full.taxa.obj$SL,
+rank_diff <- data.frame(ASV = rownames(bold_sp), 
+                       sp = mrank(bold_sp), 
+                       full= mrank(bold_full),
+                       gbank = mrank(gbank),
+                       midori = mrank(midori),
+                       a_b = bold_sp$SL - bold_full$SL,
+                       a_c = bold_sp$SL - gbank$SL,
+                       a_d = bold_sp$SL - midori$SL,
                        stringsAsFactors = FALSE)
 
 
 # 2.
-x_y_rank_m <-  melt(x_y_rank, id.vars = c('ASV', 'x_y'),
+rank_m <-  melt(rank_diff, id.vars = c('ASV', 'x_y'),
                     variable.name = 'DataBase',
                     value.name = 'Rank')
 
