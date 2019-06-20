@@ -39,6 +39,17 @@ boldid_2 <- function(x) {
   return(x_)
 }
 
+
+
+boldid_3 <- function(x) {
+  x_ <- NULL
+  for (i in 1:nrow(x)) {
+    x_[[i]] <- boldid_(x$lineage[i])
+  }
+  return(x_)
+}
+
+
 # Path ----
 
 # path <- getwd()
@@ -104,64 +115,48 @@ colnames(tax) <- c(TL, 'SL')
 
 cat('Sample size is:', nrow(tax), "\n")
 
-bold_tax <- boldid_2(tax)
+# la funcion boldid_2 toma el ultimo rank asignado por asv y hace una busqueda del boldid (tiempo demandante)
+# bold_tax <- boldid_2(tax)
+# out_tbl <- data.frame(select(tax, TL[-1]), boldid = bold_tax)
+# 
+# require(DT)
+# 
+# widget <- datatable(
+#   out_tbl, 
+#   escape=1,
+#   extensions = 'Buttons', options = list(
+#     pageLength = 25,  
+#     dom = 'Bfrtip',
+#     buttons = 
+#       list('copy', 'print', list(
+#         extend = 'collection',
+#         buttons = c('csv', 'excel'),
+#         text = 'Download'
+#       ))
+#     
+#   )
+# )
+# 
+# htmlwidgets::saveWidget(widget, paste0(tax.file, ".html"))
 
-out_tbl <- data.frame(select(tax, TL[-1]), boldid = bold_tax)
-
-require(DT)
-
-widget <- datatable(
-  out_tbl, 
-  escape=1,
-  extensions = 'Buttons', options = list(
-    pageLength = 25,  
-    dom = 'Bfrtip',
-    buttons = 
-      list('copy', 'print', list(
-        extend = 'collection',
-        buttons = c('csv', 'excel'),
-        text = 'Download'
-      ))
-    
-  )
-)
-
-htmlwidgets::saveWidget(widget, paste0(tax.file, ".html"))
-
-cat("\nDataTable conversion was done:", wang.taxonomy,"\n")
-
-quit(save = "no")
-
-# YOU CAN ALSO SUMMARY LINEAGE ITH NUMBER OF ASVS WITH THIS DISPOSAL
+# Esta version es mas rapida (boldid_3), resume el linaje al nivel de interes, en este ejemplo se usa especie 
+# ademas se incluye la abundacia aglomerada (sea numero de reads o abundancia relativa)
 
 tax <- data.frame(ASV = rownames(tax), tax)
-
 out0 <- bbold_(tax, fasta.file, count.file,  rel_ab = FALSE)
-
-
 str(rank_out <- data.frame(aglom_ab(out0, 'Species')))
 
-
-boldid_3 <- function(x) {
-  x_ <- NULL
-  for (i in 1:nrow(x)) {
-    x_[[i]] <- boldid_(x$lineage[i])
-  }
-  return(x_)
-}
-
 # connect to a secured network (or error with Web authent)
-
-boldid_(rank_out$lineage[2])
+# boldid_(rank_out$lineage[2])
 
 
 bold3_tax <- boldid_3(rank_out) # time demand!
 out_tbl <- data.frame(rank_out, boldid = bold3_tax)
 
 # or apply
-
-tax_out <- lapply(rank_out$lineage[1:3], boldid_)
-out_tbl <- data.frame(rank_out[1:3,], boldid = tax_out)
+# 
+# tax_out <- lapply(rank_out$lineage[1:3], boldid_)
+# out_tbl <- data.frame(rank_out[1:3,], boldid = tax_out)
 
 # then,
 
@@ -185,7 +180,9 @@ widget <- datatable(
 
 htmlwidgets::saveWidget(widget, paste0(tax.file, ".html"))
 
-cat("\nDataTable conversion was done:", wang.taxonomy,"\n")
+cat("\nDataTable conversion was done for:", wang.taxonomy,"\n", "in output: ", paste0(tax.file, ".html"))
 
 quit(save = "no")
+
+
 
