@@ -208,12 +208,33 @@ db_color <- function(x) {
 
 # count out levels ----
 aglom_ab <- function(x,rank) {
-  # use object from tax_sp <- select(out, abund, paste("sp", TL2, sep="_"))
   tax_g <- aggregate(x[,'abund'],  by = list(x[, rank]), FUN = sum)
-  tax_g <- data.frame(lineage = tax_g[,1], Size = tax_g[,2])
-  return(tax_g)
+  n_asvs <- aggregate(x[,rank],  by = list(x[, rank]), FUN = length)
+  min_seq_size <- aggregate(x[,'seq_size'],  by = list(x[, rank]), FUN = min)
+  
+  if(identical(tax_g[,1], n_asvs[,1])){
+    if(identical(tax_g[,1], min_seq_size[,1])){
+      tax_out <- data.frame(lineage = tax_g[,1], Abundance = tax_g[,2], Size = n_asvs[,2] , mseq_size = min_seq_size[,2])
+    }
+  }
+  # tax_out <- data.frame(lineage = tax_g[,1], Size = tax_g[,2])
+  return(tax_out)
 }
 
+# agglomerate nsamples per rank and add children level to rank
+aglom_sp <- function(x,rank) {
+  tax_g <- aggregate(x[,'abund'],  by = list(x[, rank]), FUN = sum)
+  n_asvs <- aggregate(x[,rank],  by = list(x[, rank]), FUN = length)
+  min_seq_size <- aggregate(x[,'seq_size'],  by = list(x[, rank]), FUN = min)
+  
+  if(identical(tax_g[,1], n_asvs[,1])){
+    if(identical(tax_g[,1], min_seq_size[,1])){
+      tax_out <- data.frame(lineage = tax_g[,1], Abundance = tax_g[,2], Size = n_asvs[,2] , mseq_size = min_seq_size[,2])
+    }
+  }
+  # tax_out <- data.frame(lineage = tax_g[,1], Size = tax_g[,2])
+  return(tax_out)
+}
 # get back the last rank based on the SL ----
 
 lrank <- function(x) {

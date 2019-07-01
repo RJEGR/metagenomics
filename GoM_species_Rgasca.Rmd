@@ -1,0 +1,641 @@
+---
+title: Análisis bioinformático de la diversidad de zooplancton en el Golfo de México usando el marcador COI (taxonomia integrativa con Suarez M. Eduardo y Gasca R. P (1996))
+author: "Grupo Bioinformática"
+date: "Informe `r format(Sys.Date())`"
+output:
+  word_document:
+  # word_document: default
+  # pdf_document: default
+#    reference_docx: templado-informe-Jan2019.docx
+---
+
+
+```{r setup, include=FALSE}
+# Setting global option in all the chunks-code
+knitr::opts_chunk$set(warning=FALSE, echo = FALSE, message = FALSE, dpi=300, fig.width=12, fig.height=8)
+
+## Clean workspace
+rm(list=ls())
+options(stringsAsFactors = FALSE)
+
+source(file = "~/Documents/GitHub/metagenomics/readtx.R")
+```
+
+
+```{r Paths and files}
+wang.taxonomy <- 'run014_t2_ASVs.ALL.wang.taxonomy'
+count_tbl <- 'run014_t2_ASVs_count.table'
+fasta_file <- 'run014_t2_ASVs.fasta'
+path <- '/Users/cigom/metagenomics/COI/species_resolution_per_db'
+
+# Load files
+
+tax.file <- list.files(path = path, full.names = TRUE, pattern = wang.taxonomy)[1]
+count.file <- list.files(path = path, full.names = TRUE, pattern = count_tbl)
+fasta.file <- list.files(path = path, full.names = TRUE, pattern = fasta_file)
+
+TL <- c("root","Domain","Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+
+scale2 <- c("Domain"="#edf8b1",  "Kingdom"="#7fcdbb", "Phylum"="#2c7fb8",  
+           "Class"="#feb24c",  "Order"="#addd8e",  "Family"="#31a354",
+           "Genus"="#bcbddc", "Species"="#756bb1")
+
+
+```
+
+```{r, echo=FALSE}
+
+tax <- read_rdp(tax.file)
+colnames(tax) <- c(TL, 'SL')
+
+tax <- data.frame(ASV = rownames(tax), tax)
+out0 <- bbold_(tax, fasta.file, count.file,  rel_ab = FALSE)
+
+out0[is.na(out0)] <- 'Undetermined'
+
+```
+
+```{r prepare count-per-sample table}
+
+count.tbl0 <- read.table(count.file, row.names = 1)
+
+samples.out <- names(count.tbl0)
+cruice <- sapply(strsplit(samples.out, "\\."), `[`, 1)
+subject <- sapply(strsplit(samples.out, "\\."), `[`, 2)
+transect <- substr(subject,1,1)
+type <- sapply(strsplit(samples.out, "\\."), `[`, 3)
+samples <- data.frame(Crucero=cruice, Station=subject, Transecto=transect, Tipo=type)
+
+rownames(samples) <- paste0(subject, '-', type)
+
+names(count.tbl0) <- paste0(subject, '-', type)
+
+# subset by cruice
+
+set <- rownames(samples[samples$Crucero == 'X06',])
+
+count.tbl0 <- select(count.tbl0, set)
+
+```
+
+## Introducción
+
+(preface from S.C. Goswami (2004) Zooplankton Methodology, Collection & Identification )
+
+El zooplancton abarca una variedad de animales macro y microscópicos y comprende representantes de casi todos los taxones principales, particularmente los invertebrados. Desempeñan un papel vital en la cadena alimentaria marina. El zooplancton herbívoro se alimenta de fitoplancton y, a su vez, constituye un alimento importante para los animales en niveles tróficos superiores, incluidos los peces. Los peces pelágicos, como las sardinas, las caballas y las barrigas plateadas, consumen principalmente el plancton. La aparición y la abundancia de ictioplancton (huevos de peces y larvas de peces) facilitan la ubicación de los posibles desoves y criaderos de peces.
+
+(Zooplancton de méxico, Suarez M. Eduardo y Gasca R. P. 665-694)
+
+Los mares mexicanos se caracterizan por poseer una amplia diversidad de hábitats, incluyendo las grandes extensiones oceanográficas del golfo de méxico y el pacífico, así como las productivas áreas de plataforma y las amplisimas zonas costeras, que incluyen lagunas hipo e hipersalinas, praderas de pastos marinos, pantanos, manglares, etc. a ello podrían adicionarse las zonas de transición que abarcan también las áreas perturbadas por la actividad humana. En los sistemas costeros, sujetos a particulares condiciones, es posible observar la influencia de las aportaciones de agua dulce; en México, puede hablarse de una amplia diversidad de sistemas costeros que son afines a los estuarios en términos de su comportamiento ecológico y sus características ambientales, tanto en la vertiente mexicana del Pacífico como en las del golfo de México y el Mar caribe.
+
+Si bien es posible hacer ciertas generalizaciones a bordo de distintos sistemas de los mares mexicanos en relación con el zooplancton, la variabilidad fisiográfica (origen, geología, profundidad, área, configuración) e hidrología (variación de temperatura, salinidad, oxígeno disuelto, corrientes internas, masas de agua) de estos ambientes en conjunto resulta tan amplia en México, que no sería posible analizar adecuadamente cada uno de estos sistemas en función de su fauna practica. Así, se consideró que en un texto de esta naturaleza resulta más apropiado intentar hacer una revisión general y comentada acerca de los estudios del zooplancton y sus elementos en los diferentes sistemas bajo una visión descriptiva y global. 
+
+### Biomasa
+Los estudios sobre la biomasa zooplanctónica constituyen herramientas fundamentales para comprender mejor el funcionamiento de un ecosistema a lo largo del tiempo y aporta información para caracterizar biológicamente y para estimar su productividad secundaria. Las mayores variaciones en la abundancia de las poblaciones de los organismos zooplancticos que habitan en un ecosistema se reflejan claramente en la biomasa. En las lagunas costeras las fluctuaciones en la biomasa por lo general pueden asociarse con cambios estacionales o periodos climáticos; es común que en latitudes con estacionalidad marcada se presenten bajas biomasas zooplancticas en invierno y un incremento significativo en la primavera (Landry, 1976; Turner, 1982); esto se puede ejemplificar en un ecosistema mexicano citando lo encontrado por Mendez-Lanz (1988) en el Estero de punta Banda, Baja California. En latitudes  tropicales, las épocas climáticas de lluvias, secas y ‘nortes’ son determinantes en las fluctuaciones de biomasa zooplanctica; los meses de lluvias y nortes comúnmente favorecen el incremento de sus valores (Gomez-Aguirre, 1974; Monry-Garcia, 1987; Gasca y Suarez, 1994) en los ecosistemas costeros.
+
+Sin embargo, aún hace falta información sobre el comportamiento de la biomasa zooplancton en las lagunas costeras y zonas oceánicas de México, mediante el empleo de una metodología homogénea con análisis espacio-temporal y la utilización de unidades comparativas. 
+
+
+### Unidades operacionales taxonomicas - moleculares
+La influencia antropogenica son causante de cambios sin precendentes a la tasa de la perdida de biodiversidad y, consecuentemente funciones del ecosistema (Cardinale et al 2012; visto en Deiner K. et al 2016). En base a lo anterior, es necesario el uso de estrategias para inspeccionar la biodiversidad de manera rapida para medir las fluctuaciones en la riqueza de especies para informes de conservacion y manejo de especies (Kelly et al 2014)
+
+
+### Composición
+
+De acuerdo a Flemminger y Hulsemann (1977), para el reconocimiento y caracterización de una comunidad de zooplanctica deben considerarse tres factores principales: 
+
+* La correcta identificación taxonómica de los organismos
+* La sistemática de la biota
+* El conocimiento de los intervalos de distribución correspondiente
+
+Aquí es necesario destacar el papel fundamental de la taxonomía para establecer correctamente la identidad de los individuos como base para estudios más profundos; lamentablemente, no es raro que a partir de identificaciones erróneas se hayan generado inconsistencias y discrepancias de carácter ecológico o  geográfico al analizar la distribución local o regional de los organismos del zooplancton. 
+
+Con estas premisa se analizan a continuación algunos aspectos de los grupos más representativos del zooplancton de los mares y lagunas costeras de México.
+
+* Rotíferos
+* Medusas (Hidromedusas y Escifomedusas)
+* Sifonóforos
+* Ctenóforos
+* Poliquetos
+* Cladóceros
+* Copépodos
+* Ostrácodos
+* Eufáusidos
+* Cumáceos
+* Anfipodos
+* Heteropodos
+* Pterópodos
+* Quetognatos
+* Apendicularias
+* Ictioplancton
+
+## Rotíferos
+
+Este grupo es propio de agua dulce. Generalmente, se les ha observado asociados a zonas costeras (Egloff, 1988) y en ciertos ambientes marinos salobres llegan a conformar una parte considerable de la biomasa zooplanctica (Schnese, 1973). En el norte del Golfo de México se han registrado a _Trichodera marina_ y a representantes del género _Synchaeta_. es un grupo prácticamente desconocido en los mares mexicanos. 
+
+Este filo no se encuentran en datos pertenecientes a muestras de mar ambienteles del golfo de mexico
+
+```{r busqueda de rotiferos, echo = FALSE}
+rank <- 'Phylum'
+
+Rotifera <- filter(out0,  Phylum == 'Rotifera')
+# Filos encontrados
+phylum <- data.frame(table(out0$Phylum))
+
+```
+
+## Medusas (Cnidiaria)
+
+Las medusas pueden dividirse en: 
+
+* hidromedusas == *meroplancticas* (con un ciclo de vida metagenico asociado con fase pólipo (gr., "muchos pies") sésil)
+
+* escifomedusas == holoplancticas (con todo su ciclo de vida en la columna de agua). 
+
+Algunos géneros de *hidromedusas* que frecuentemente ocurren en ambientes de tipo lagunar son:
+
+* Cnidaria;Hydrozoa;Leptothecata;Aequoreidae; _Aequorea_ *
+* Cnidaria;Hydrozoa;Anthoathecata;Bougainvilliidae; _Bougainvillia_ *
+* Cnidaria;Hydrozoa;Anthoathecata;Corynidae; _Sarsia_ *
+* Cnidaria;Hydrozoa;Limnomedusae;Olindiidae; _Olindias_ *
+* Cnidaria;Hydrozoa;Leptothecata;Campanulariidae; _Obelia_ *
+
+$$^{*}$$Géneros encontrado en los archivos de BOLD
+
+```{r Generos Medusas, fig.align = "center", fig.cap = "Figura 1"}
+rank <- 'Genus'
+cnidaria0 <- filter(out0,  Order != 'Siphonophorae')
+cnidaria <- filter(cnidaria0,  Phylum == 'Cnidaria')
+cnidaria <- cnidaria[order(cnidaria$Genus),]
+# remove sifonoforo
+
+cnidaria_agg <- data.frame(aglom_ab(cnidaria, rank))
+knitr::kable(cnidaria_agg, caption = 'Generos encontrados en Moluscos')
+
+# visualize
+library(ggplot2)
+
+ggplot(cnidaria, 
+       aes(y=..count.., x=SL)) + 
+  geom_histogram(aes(y=..count..), position=position_dodge(), alpha=0.5, bins = 30) +
+   scale_x_continuous(name = "Rank", breaks  =  c(min(cnidaria$SL):max(cnidaria$SL)), labels = TL[min(cnidaria$SL):max(cnidaria$SL)]) +
+  theme_bw(base_size = 12) +
+  labs(y="Frequency of ASVs", 
+        title = 'Level of Resolution assigned to this group') +
+  coord_flip()
+#   scale_fill_brewer(palette = "Set1") +
+#   labs(x="change", y="Frequency of ASVs", 
+#        title = 'Level of Resolution assigned to this group') +
+#   facet_wrap( ~ Rank , scales = 'free_y') +
+# theme_bw(base_size = 12)
+
+```
+
+```{r tabla de ordenes de cnidiarios}
+#str(Hydrozoa <- filter(out0,  Class == 'Hydrozoa'))
+#Hydrozoa <- Hydrozoa[order(Hydrozoa$Genus),]
+
+
+# knitr::kable(data.frame(aglom_ab(cnidaria, 'Class')), caption = 'Clases encontrados en cnidiarios')
+
+knitr::kable(data.frame(aglom_ab(cnidaria, 'Order')), caption = 'Ordenes encontrados en cnidiarios')
+```
+
+En los siguientes resultados solo el géneros _Obelia_ fue encontrado y el orden _Anthoathecata_ y _Leptothecata_ , donde se encuentran los generos _Sarsis_ y _Bougainvillia_. Se remueve el orden mas abundante que es el _Siphonophorae_ para describir especies cripticas.
+
+```{r Generos de hidromedusas, echo = FALSE, fig.align = "center", fig.cap = "Figura ..."}
+
+library(ggalluvial)
+
+
+alluv_in <- cnidaria[,TL[4:8]]
+
+alluv_in[is.na(alluv_in)] <- 'Undetermined'
+
+# Exclude siphonophores
+alluv_in <- filter(alluv_in, Order != 'Siphonophorae')
+
+alluv_long <- to_lodes_form(data.frame(alluv_in), key = "Rank", axes = 1:5)
+alluv_long <- filter(alluv_long, stratum != 'Undetermined')
+
+is_alluvia_form(alluv_long, silent = TRUE)
+
+# fill
+
+alluv_long$Fill <- 'Other'
+
+alluv_long[which(alluv_long$stratum == 'Anthoathecata'), 'Fill'] <- 'Meroplankton'
+
+alluv_long[which(alluv_long$stratum == 'Leptothecata'), 'Fill'] <- 'Meroplankton'
+
+alluv_long[which(alluv_long$stratum == 'Campanulariidae'), 'Fill'] <- 'Meroplankton'
+
+alluv_long[which(alluv_long$stratum == 'Obelia'), 'Fill'] <- 'Meroplankton'
+
+# and holoplanktonic
+
+#alluv_long[which(alluv_long$stratum == 'Scyphozoa'), 'Fill'] <- 'Holoplankton'
+alluv_long[which(alluv_long$stratum == 'Scyphozoa'), 'Fill'] <- 'Holoplankton'
+alluv_long[which(alluv_long$stratum == 'Semaeostomeae'), 'Fill'] <- 'Holoplankton'
+alluv_long[which(alluv_long$stratum == 'Ulmaridae'), 'Fill'] <- 'Holoplankton'
+alluv_long[which(alluv_long$stratum == 'Aurelia'), 'Fill'] <- 'Holoplankton'
+
+ggplot(data = alluv_long,
+       aes(x = Rank, stratum = stratum, alluvium = alluvium,
+           label = stratum)) +
+  geom_stratum() + 
+  geom_text(stat = "stratum", size = 3) +
+  geom_flow(aes(fill = Fill), stat = "alluvium",
+            aes.bind = TRUE, lode.guidance = "rightward") +
+  theme_minimal() +
+  ggtitle("The frequency distribution of meroplankton in the GoM.") +
+  xlab("Level of resolution") + ylab("Number of ASVs")
+```
+
+La abundancia local y las variaciones estacionales de las medusas meroplancticas, al ser la parte libre nadadora de un ciclo metagenetico, se encuentran ligadas a los ritmos reproductivos de la fase pólipo.
+
+En México, algunas especies de *escifomedusas* se encuentran fuertemente asociadas con las lagunas hipersalinas, como en Laguna madre, donde se ha encontrado a la escifomedusa _Stomolophus meleagris_ como componente imortante del zooplancton local (Britton y Morton, 1989); esta especie, junto con Aurelia aurita y Rhopilema sp. se han observado en el sistema lagunar El Carmen-Machona-Redonda en Tabasco (Gomez-Aguirre y Uribe-Ortega, 1980; Gomez-Aguirre y Resendez-Medina, 1986). 
+En algunas lagunas de Veracruz (Laguna de Tamiahua, Estuario de Tuxpan, del Nautla, Laguna Grande, L. de la mancha) se han determinado varias especies de hidromedusas como:
+
+* _Dipurena strangulata_ **
+* _Bougainvillia niobe_ **
+* _Phialopsis diegensis_ **
+* _Aequorea aequorea_ **
+* Cnidaria;Hydrozoa;Leptothecata;Campanulariidae;Obelia; _Obelia spp_ *
+
+Y *escifomedusas*:
+
+* Cnidaria;Cubozoa;Chirodropida;Chiropsalmidae;Chiropsalmus; _Chiropsalmus quadrumanus_ *
+* Cnidaria;Scyphozoa;Semaeostomeae;Pelagiidae;Chrysaora; _Chrysaora  quinquecirrha_ *
+* Cnidaria;Scyphozoa;Semaeostomeae;Ulmaridae;Aurelia; _Aurelia aurita_ *
+
+* Especies encontrado en los archivos de WORMS
+ 
+```{r Busqueda de Medusas por especies}
+rank <- 'Species'
+cnidaria_sp <- data.frame(aglom_ab(cnidaria, rank))
+
+#str(Siphonophorae <- filter(out0, Order == 'Siphonophorae'))
+#str(rank_out <- data.frame(aglom_ab(Siphonophorae, 'Species')))
+
+# filter(cnidaria, Order == 'Semaeostomeae')
+
+knitr::kable(data.frame(aglom_ab(cnidaria, rank)), caption = 'Especies encontrados en cnidiarios')
+```
+
+Al analizar las especies de escifomedusas asociadas a lagunas saladas encontramos unicamente la especie _Aurelia sp_ con una abundancia en numero de secuencias de 50 y un solo ASV (ASV_7241) dentro de los datos.
+
+
+### Sifonóforos 
+
+Los sifonóforos son celenterados coloniales holoplancticos con gran capacidad depredadora. La mayor parte de los sifonóforos encontrados como más abundantes pertenecen al suborden _Calycophorae_; sin embargo, se piensa que el muestreo con redes submuestrea otros sifonoforos que pueden evadir las redes. Todas las especies de este grupo son marinas y rara vez se les encuentra en las lagunas costeras; sin embargo, algunas de las especies de más amplio ámbito distribucional y mayor abundancia en zonas neríticas y oceánicas han sido observadas en lagunas costeras y en zonas estuarinas del Golfo de México y del Mar Caribe mexicano (Burke, 1975; Gasca 1990a), como:
+
+* _Abylopsis tetragona_ **
+* _Abylopsis eschscholtzi **
+* _Chelophyes appendiculata_ *
+* _Diphyes bojani_ **
+* _Diphyes dispar_ **
+* _Physalia physalis_ *
+
+* reported in BOLD but not found in our data
+** reported in BOLD and found in our data
+
+```{r Siphonophorae order}
+
+Siphonophorae <- filter(out0, Order == 'Siphonophorae')
+rank <- 'Species'
+Siphonophorae_sp <- data.frame(aglom_ab(Siphonophorae, rank))
+
+# #
+spp <- c('Abylopsis tetragona', 'bylopsis eschscholtzi',  'Diphyes bojani', 'Diphyes dispar')
+
+spp <- Siphonophorae_sp$lineage
+
+siphonop_ASVs <- rownames(out0[out0$Species %in% spp, ])
+siphonop_ASV0 <- out0[out0$Species %in% spp, TL[6:9]]
+# siphonop_ASV0 <- data.frame(ASV = rownames(siphonop_ASV0), siphonop_ASV0)
+
+knitr::kable(data.frame(Siphonophorae_sp), caption = 'Especies encontrados en Siphonophorae')
+
+```
+
+...
+
+```{r from two chunks above}
+
+count.tbl <- count.tbl0[rownames(count.tbl0) %in% siphonop_ASVs, ]
+
+sample_size <- colSums(count.tbl)
+
+# remove samples with abundance of zero
+count.tbl <- count.tbl[sample_size > 0]
+
+# order count.tbl based on the asvs match
+count.tbl <- count.tbl[match(siphonop_ASVs, rownames(count.tbl)),] 
+
+total <- sum(rowSums(count.tbl))
+nreads <- rowSums(count.tbl)
+rabund <- data.frame(ASV = names(nreads), rabund = (nreads / total) * 100)
+rabund <- rabund[match(siphonop_ASVs, rownames(rabund)),]
+
+identical(rownames(rabund), rownames(count.tbl))
+
+# Recortar el numero de muestras en base a  count.tbl[sample_size > 0]
+samples_sbt <- samples[rownames(samples) %in% names(count.tbl),]
+samples_sbt <- samples_sbt[match(names(count.tbl), rownames(samples_sbt)),]
+
+names(count.tbl) <- samples_sbt$Station
+
+# count.tbl <- data.frame(ASV = rownames(count.tbl), count.tbl, )
+
+identical(rownames(siphonop_ASV0), rownames(count.tbl))
+identical(rownames(rabund), rownames(siphonop_ASV0))
+
+data_map <- data.frame(count.tbl, siphonop_ASV0) # rabund[-1], 
+
+library(reshape)
+
+data_mapm <- melt(data_map, id.vars =  c(TL[6:9]) ,variable_name = 'Station' )
+
+# remove zero in the file
+data_mapm <- filter(data_mapm, value > 1)
+
+# add transect group
+
+data_mapm$transect <- substr(data_mapm$Station, 1,1)
+
+```
+
+```{r Siphonophorae Bubbleplot, echo = FALSE, fig.align = "center", fig.cap = "Figura ..." }
+
+# los bubbleplots no son muy buenos para series numericas de rangos tan largos como estos.
+
+Species_lev <- unique(data_mapm[order(data_mapm$Family), 'Species'])
+
+data_mapm$Species <- factor(data_mapm$Species, levels = rev(Species_lev))
+
+ggplot(data_mapm, 
+       aes(x=Station, 
+           y=Species, 
+           color=Family)) +
+  geom_point(aes(size=value)) + 
+  scale_size_continuous(name = 'Reads number', 
+                        breaks = c(100, 500, 1000, 1500, 2000),
+                        labels = c(' =< 100', '500', '1000', '1500', '2000')) +
+  facet_grid(. ~transect, scales="free_x") +
+  #scale_color_manual(values = getPalette(colourCount)) +
+  scale_color_brewer(palette = 'Paired') +
+  theme_bw() +
+  theme(
+        axis.title.x=element_blank(),
+        axis.text.x=element_text(angle = 90, hjust = 1))
+```
+
+```{r Siphonophorae map, eval = FALSE, echo = FALSE}
+# Tambien si contamos con coordenadas y datos abioticos podemos incluir el siguiente flujo de mapas
+
+library(ggrepel)
+library(ggplot2)
+library(tidyverse)
+
+world <- ggplot2::map_data("world", region = "Mexico") 
+
+gg <- ggplot() + 
+  geom_polygon(data = world, aes(x=long, y = lat, group = group), fill = NA, color = "black", size = 0.7) + 
+  coord_fixed(xlim = c(-99,-84), ylim = c(18,26)) 
+
+# y cargamos el dataframe de coordenadas, y lo asociamos a la matriz de presencia/ausencia / abundancia
+
+coors <- read.csv("~/Downloads/metadata_xiximi06.csv", header=TRUE, stringsAsFactors = FALSE)
+
+
+gg + 
+    geom_point(data = coors, aes(Longitude, Latitude), alpha = 0.7) +
+    geom_text_repel(data = coors,
+                  aes(Longitude, Latitude, label = Station),
+                  segment.color = "grey50"
+                  ) + 
+        theme(text = element_text(size=12)) +
+  theme_bw()
+
+# or 
+
+data_mapm %>%
+    as.tibble() %>%
+    group_by(Station) %>%
+    inner_join(coors, by = "Station")  -> map_plot
+
+
+# colour
+
+library(RColorBrewer)
+
+getPalette = colorRampPalette(brewer.pal(8, "Paired")) #RdYlBu
+colourCount <- length((unique(map_plot$Order)))
+
+# y ploteamos
+# 1 Solo mapa con tamano de punto por el tamano de la muestra (log10)
+
+plot <- NULL
+
+plot <- gg + 
+    geom_point(data = map_plot, 
+               aes(Longitude, Latitude, color = Order,  
+                   shape=Order, size = value), alpha = 0.7) +  
+    scale_color_manual(values = c(getPalette(colourCount))) +  
+    ggtitle("")
+
+```
+
+Un sifonóforo pleustico cuyo neumatóforo o flotador se encuentra sobre la superficie del agua y el resto de la colonia permanece sumergido; el flotador aéreo permite a estos organismos desplazarse ayudado por los vientos. Es justamente por esta característica que en ciertas épocas se llegan a internar a las lagunas costeras y aparecen varados en la zona litoral, en ocasiones abundantemente (Escamilla-sánchez, 1987).
+
+En el Golfo de México y zonas oceánicas adyacentes como el Banco de Campeche y el Canal de Yucatán se han realizado diversos estudios acerca de estos celenterados (Phillips, 1972; Vasiliev. 1974; Michel y Foyo, 1976; Gasca, 1990b; Gasca y Suárez. 1989a,b; 1991a,b). Las especies consideradas más comunes en esta zona son: 
+
+* _Diphyes dispar_
+* _D. bojani_
+* _Eudoxoides spiralis_ *
+* _Bassia bassensis_ *
+* _Chelophyes appendiculata_
+* _Lensia subtilis_
+* _L. campanella_
+* _Abylopsis tetragona_
+* _A. eschscholtzi_
+
+En aguas oceánicas del Golfo de México, Gasca y Suárez (1993) registraron a Lensia canopusi; esta especie no había sido observada en el Océano Atlántico.
+
+## Ctenóforos
+
+```{r Ctenophora w/ zero registers}
+# it has register in BOLD db
+# http://boldsystems.org/index.php/TaxBrowser_TaxonPage?taxid=249225
+
+Ctenophora <- filter(out0, Phylum == 'Ctenophora')
+```
+
+
+## Poliquetos
+
+```{r Poliquetos }
+# it has register in BOLD db
+# http://boldsystems.org/index.php/TaxBrowser_TaxonPage?taxid=249225
+
+Annelida <- filter(out0, Phylum == 'Annelida')
+
+rank <- 'Genus'
+
+Annelida_agg <- data.frame(aglom_ab(Annelida, rank))
+knitr::kable(Annelida_agg)
+
+#
+
+
+library(ggalluvial)
+
+
+alluv_in <- Annelida[,TL[5:9]]
+
+alluv_in[is.na(alluv_in)] <- 'Undetermined'
+
+alluv_long <- to_lodes_form(data.frame(alluv_in), key = "Rank", axes = 1:5)
+alluv_long <- filter(alluv_long, stratum != 'Undetermined')
+
+is_alluvia_form(alluv_long, silent = TRUE)
+
+ggplot(data = alluv_long,
+       aes(x = Rank, stratum = stratum, alluvium = alluvium,
+           label = stratum)) +
+  geom_stratum() + 
+  geom_text(stat = "stratum", size = 2.5) +
+  geom_flow(stat = "alluvium",
+            aes.bind = TRUE, lode.guidance = "rightward") +
+  theme_minimal() +
+  ggtitle("The frequency distribution of zooplankton in the GoM.") +
+  xlab("Level of resolution") + ylab("Number of ASVs")
+```
+
+
+## Cladoceros
+
+```{r Cladoceros}
+
+Branchiopoda <- filter(out0, Class == 'Branchiopoda')
+
+rank <- 'Species'
+
+data_agg <- data.frame(aglom_ab(Branchiopoda, rank))
+knitr::kable(data_agg)
+
+```
+
+## Copepoda
+
+```{r copepodo bubbleplot}
+# class: Hexanauplia, subclass: copepoda, tantulocarida, thecostraca
+rank <- 'Species'
+
+lineage <- 'Hexanauplia'
+
+filter_rank <- filter(out0, Class == lineage)
+
+data_agg <- data.frame(aglom_ab(filter_rank, rank))
+
+knitr::kable(data_agg)
+
+vector_ <- filter(data_agg, lineage != 'Undetermined')$lineage
+
+list_ASVs <- rownames(out0[out0$Species %in% vector_, ])
+
+list_ASVs0 <- out0[out0[, rank] %in% vector_, TL[5:9]]
+
+count.tbl <- count.tbl0[rownames(count.tbl0) %in% list_ASVs, ]
+
+sample_size <- colSums(count.tbl)
+
+# remove samples with abundance of zero
+count.tbl <- count.tbl[sample_size > 0]
+
+# order count.tbl based on the asvs match
+count.tbl <- count.tbl[match(list_ASVs, rownames(count.tbl)),] 
+
+# ....
+
+# Recortar el numero de muestras en base a  count.tbl[sample_size > 0]
+samples_sbt <- samples[rownames(samples) %in% names(count.tbl),]
+samples_sbt <- samples_sbt[match(names(count.tbl), rownames(samples_sbt)),]
+
+names(count.tbl) <- samples_sbt$Station
+
+# count.tbl <- data.frame(ASV = rownames(count.tbl), count.tbl, )
+
+identical(rownames(list_ASVs0), rownames(count.tbl))
+
+data_map <- data.frame(count.tbl, list_ASVs0)
+
+
+library(reshape)
+
+data_mapm <- melt(data_map, id.vars =  c(TL[5:9]) ,variable_name = 'Station' )
+
+# remove zero in the file
+data_mapm <- filter(data_mapm, value > 1)
+
+# add transect group
+
+data_mapm$transect <- substr(data_mapm$Station, 1,1)
+
+Species_lev <- unique(data_mapm[order(data_mapm$Family), 'Species'])
+
+data_mapm$Species <- factor(data_mapm$Species, levels = rev(Species_lev))
+
+library(RColorBrewer)
+
+getPalette = colorRampPalette(brewer.pal(12, "Paired"))
+colourCount <- length((unique(data_mapm$Family)))
+
+ggplot(data_mapm, 
+       aes(x = Station, 
+           y = Species,
+           color = Family)) +
+  geom_point(aes(size=value)) + 
+  #scale_size_continuous(name = 'Reads number', 
+  #                      breaks = c(100, 500, 1000, 1500, 2000),
+  #                      labels = c(' =< 100', '500', '1000', '1500', '2000')) +
+  facet_grid(Order~transect, scales="free", space = 'free') +
+  scale_color_manual(values = getPalette(colourCount)) +
+  #scale_color_brewer(palette = 'Paired') +
+  theme_bw() +
+  theme(
+        axis.title.x=element_blank(),
+        axis.text.x=element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+
+
+
+library(ggalluvial)
+
+
+alluv_in <- Hexanauplia[,TL[5:9]]
+
+alluv_in[is.na(alluv_in)] <- 'Undetermined'
+
+alluv_long <- to_lodes_form(data.frame(alluv_in), key = "Rank", axes = 1:5)
+
+alluv_long <- filter(alluv_long, stratum != 'Undetermined')
+
+is_alluvia_form(alluv_long, silent = TRUE)
+
+ggplot(data = alluv_long,
+       aes(x = Rank, stratum = stratum, alluvium = alluvium,
+           label = stratum)) +
+  geom_stratum() + 
+  geom_text(stat = "stratum", size = 2.5) +
+  geom_flow(stat = "alluvium",
+            aes.bind = TRUE, lode.guidance = "rightward") +
+  theme_minimal() +
+  ggtitle("The frequency distribution of zooplankton in the GoM.") +
+  xlab("Level of resolution") + ylab("Number of ASVs")
+
+
+```

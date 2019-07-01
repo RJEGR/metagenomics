@@ -12,10 +12,12 @@ options(stringsAsFactors = FALSE)
 wang.taxonomy <- args[1]
 count_tbl <- args[2]
 fasta_file <- args[3]
+rank <- arg[4]
 
 wang.taxonomy <- 'run014_t2_ASVs.ALL.wang.taxonomy'
 count_tbl <- 'run014_t2_ASVs_count.table'
 fasta_file <- 'run014_t2_ASVs.fasta'
+rank <- 'Phylum'
 
 # ------ functions
 
@@ -63,7 +65,7 @@ count.file <- list.files(path = path, full.names = TRUE, pattern = count_tbl)
 fasta.file <- list.files(path = path, full.names = TRUE, pattern = fasta_file)
 
 
-cat('File to process: ', tax.file, "\n")
+cat('File to process: ', tax.file[1], "\n")
 cat('with ', count_tbl, 'and ', fasta_file)
 
 TL <- c("root","Domain","Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
@@ -109,7 +111,7 @@ TL <- c("root","Domain","Kingdom", "Phylum", "Class", "Order", "Family", "Genus"
 
 source(file = "~/Documents/GitHub/metagenomics/readtx.R")
 
-tax <- read_rdp(tax.file)
+tax <- read_rdp(tax.file[1])
 
 colnames(tax) <- c(TL, 'SL')
 
@@ -144,7 +146,8 @@ cat('Sample size is:', nrow(tax), "\n")
 
 tax <- data.frame(ASV = rownames(tax), tax)
 out0 <- bbold_(tax, fasta.file, count.file,  rel_ab = FALSE)
-str(rank_out <- data.frame(aglom_ab(out0, 'Species')))
+
+str(rank_out <- data.frame(aglom_ab(out0, rank)))
 
 # connect to a secured network (or error with Web authent)
 # boldid_(rank_out$lineage[2])
@@ -178,9 +181,9 @@ widget <- datatable(
   )
 )
 
-htmlwidgets::saveWidget(widget, paste0(tax.file, ".html"))
+htmlwidgets::saveWidget(widget, paste0(tax.file[1], "." ,rank, ".html"))
 
-cat("\nDataTable conversion was done for:", wang.taxonomy,"\n", "in output: ", paste0(tax.file, ".html"))
+cat("\nDataTable conversion was done for:", wang.taxonomy,"\n", "in output: ", paste0(tax.file[1], ".html"))
 
 quit(save = "no")
 

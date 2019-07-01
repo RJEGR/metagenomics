@@ -2,12 +2,16 @@
 # Esta estrategia es implementada por Cahalahan et al 
 # https://benjjneb.github.io/dada2/ITS_workflow.html
 
+
+rm(list = ls())
+
 library(ShortRead)
 packageVersion("ShortRead")
 library(Biostrings)
 packageVersion("Biostrings")
 library("PrimerMiner")
 packageVersion("PrimerMiner")
+
 
 
 FWD <- "GGWACWGGWTGAACWGTWTAYCCYCC"  ## FORWARD &
@@ -68,15 +72,12 @@ write(out_fasta, file=file_name)
 
 evaluate_primer()
 
-
-
-
 evaluate_primer(alignment, FWD, forward = T, save = NULL, gap_NA = T, N_NA = T, mm_position
  = NULL, mm_type = NULL, adjacent = 2, sequ_names=T)
 
-
-cd vsearch-2.12.0
-./autogen.sh
-./configure
-make
-make install 
+# 
+# cd vsearch-2.12.0
+# ./autogen.sh
+# ./configure
+# make
+# make install 
