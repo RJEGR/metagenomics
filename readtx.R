@@ -211,30 +211,19 @@ aglom_ab <- function(x,rank) {
   tax_g <- aggregate(x[,'abund'],  by = list(x[, rank]), FUN = sum)
   n_asvs <- aggregate(x[,rank],  by = list(x[, rank]), FUN = length)
   min_seq_size <- aggregate(x[,'seq_size'],  by = list(x[, rank]), FUN = min)
+  max_nsamples <- aggregate(x[,'nsamples'],  by = list(x[, rank]), FUN = max)
   
   if(identical(tax_g[,1], n_asvs[,1])){
     if(identical(tax_g[,1], min_seq_size[,1])){
-      tax_out <- data.frame(lineage = tax_g[,1], Abundance = tax_g[,2], Size = n_asvs[,2] , mseq_size = min_seq_size[,2])
+      tax_out <- data.frame(lineage = tax_g[,1], Abundance = tax_g[,2], Size = n_asvs[,2] , mseq_size = min_seq_size[,2], Mnsamples = max_nsamples[,2])
     }
   }
   # tax_out <- data.frame(lineage = tax_g[,1], Size = tax_g[,2])
   return(tax_out)
 }
 
-# agglomerate nsamples per rank and add children level to rank
-aglom_sp <- function(x,rank) {
-  tax_g <- aggregate(x[,'abund'],  by = list(x[, rank]), FUN = sum)
-  n_asvs <- aggregate(x[,rank],  by = list(x[, rank]), FUN = length)
-  min_seq_size <- aggregate(x[,'seq_size'],  by = list(x[, rank]), FUN = min)
-  
-  if(identical(tax_g[,1], n_asvs[,1])){
-    if(identical(tax_g[,1], min_seq_size[,1])){
-      tax_out <- data.frame(lineage = tax_g[,1], Abundance = tax_g[,2], Size = n_asvs[,2] , mseq_size = min_seq_size[,2])
-    }
-  }
-  # tax_out <- data.frame(lineage = tax_g[,1], Size = tax_g[,2])
-  return(tax_out)
-}
+# agglomerate nsamples per rank and add children level to rank (REMOVE)
+
 # get back the last rank based on the SL ----
 
 lrank <- function(x) {
@@ -301,6 +290,8 @@ bbold_ <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = T
   count.tbl0 <- read.table(count_tbl)
   total <- sum(rowSums(count.tbl0))
   nreads <- rowSums(count.tbl0)
+  
+  nsamples <- data.frame(nsamples = c(apply(count.tbl0, 1, function(x) {sum(x > 0)})))
 
   if(rel_ab) {
     rabund <- data.frame(ASV = names(nreads), rabund = (nreads / total) * 100)
@@ -314,10 +305,13 @@ bbold_ <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = T
   }
   
   if(identical(rownames(rabund0), db_subset)) {
-    
-    count.tbl <- data.frame(ASV = rownames(count.tbl0)[which(rownames(count.tbl0) %in% db_subset)],
-                            abund = rabund0$rabund)
-    count.tbl <- count.tbl[match(db_subset, count.tbl$ASV),]
+    if(identical(rownames(nsamples), db_subset)) {
+      
+      count.tbl <- data.frame(ASV = rownames(count.tbl0)[which(rownames(count.tbl0) %in% db_subset)],
+                              abund = rabund0$rabund,  nsamples)
+      count.tbl <- count.tbl[match(db_subset, count.tbl$ASV),]
+      
+    }
   }
   
   # sanity check
@@ -343,6 +337,7 @@ bbold_ <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = T
     out <- data.frame(ASV = names(seqs),
                       seq_size = width(seqs),
                       abund = count.tbl$abund,
+                      nsamples = count.tbl$nsamples,
                       select(tax, -ASV),
                       stringsAsFactors = FALSE)
   }

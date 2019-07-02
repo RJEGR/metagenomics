@@ -57,9 +57,9 @@ out0[is.na(out0)] <- 'Undetermined'
 
 ```{r prepare count-per-sample table}
 
-count.tbl0 <- read.table(count.file, row.names = 1)
+count.obj0 <- read.table(count.file, row.names = 1)
 
-samples.out <- names(count.tbl0)
+samples.out <- names(count.obj0)
 cruice <- sapply(strsplit(samples.out, "\\."), `[`, 1)
 subject <- sapply(strsplit(samples.out, "\\."), `[`, 2)
 transect <- substr(subject,1,1)
@@ -68,13 +68,13 @@ samples <- data.frame(Crucero=cruice, Station=subject, Transecto=transect, Tipo=
 
 rownames(samples) <- paste0(subject, '-', type)
 
-names(count.tbl0) <- paste0(subject, '-', type)
+names(count.obj0) <- paste0(subject, '-', type)
 
 # subset by cruice
 
 set <- rownames(samples[samples$Crucero == 'X06',])
 
-count.tbl0 <- select(count.tbl0, set)
+count.obj0 <- select(count.obj0, set)
 
 ```
 
@@ -130,7 +130,6 @@ Con estas premisa se analizan a continuación algunos aspectos de los grupos má
 * Ictioplancton
 
 ## Rotíferos
-
 Este grupo es propio de agua dulce. Generalmente, se les ha observado asociados a zonas costeras (Egloff, 1988) y en ciertos ambientes marinos salobres llegan a conformar una parte considerable de la biomasa zooplanctica (Schnese, 1973). En el norte del Golfo de México se han registrado a _Trichodera marina_ y a representantes del género _Synchaeta_. es un grupo prácticamente desconocido en los mares mexicanos. 
 
 Este filo no se encuentran en datos pertenecientes a muestras de mar ambienteles del golfo de mexico
@@ -323,35 +322,45 @@ knitr::kable(data.frame(Siphonophorae_sp), caption = 'Especies encontrados en Si
 
 ```{r from two chunks above}
 
-count.tbl <- count.tbl0[rownames(count.tbl0) %in% siphonop_ASVs, ]
+count.obj <- count.obj0[rownames(count.obj0) %in% siphonop_ASVs, ]
 
-sample_size <- colSums(count.tbl)
+sample_size <- colSums(count.obj)
 
 # remove samples with abundance of zero
-count.tbl <- count.tbl[sample_size > 0]
+count.obj <- count.obj[sample_size > 0]
 
-# order count.tbl based on the asvs match
-count.tbl <- count.tbl[match(siphonop_ASVs, rownames(count.tbl)),] 
+# data.frame(nsamples = apply(count.obj, 1, function(x) {sum(x > 0)}))
 
-total <- sum(rowSums(count.tbl))
-nreads <- rowSums(count.tbl)
+# order count.obj based on the asvs match
+count.obj <- count.obj[match(siphonop_ASVs, rownames(count.obj)),] 
+
+
+total <- sum(rowSums(count.obj))
+nreads <- rowSums(count.obj)
 rabund <- data.frame(ASV = names(nreads), rabund = (nreads / total) * 100)
 rabund <- rabund[match(siphonop_ASVs, rownames(rabund)),]
 
-identical(rownames(rabund), rownames(count.tbl))
+identical(rownames(rabund), rownames(count.obj))
 
-# Recortar el numero de muestras en base a  count.tbl[sample_size > 0]
-samples_sbt <- samples[rownames(samples) %in% names(count.tbl),]
-samples_sbt <- samples_sbt[match(names(count.tbl), rownames(samples_sbt)),]
+# Recortar el numero de muestras en base a  count.obj[sample_size > 0]
+samples_sbt <- samples[rownames(samples) %in% names(count.obj),]
+samples_sbt <- samples_sbt[match(names(count.obj), rownames(samples_sbt)),]
 
-names(count.tbl) <- samples_sbt$Station
+names(count.obj) <- samples_sbt$Station
 
-# count.tbl <- data.frame(ASV = rownames(count.tbl), count.tbl, )
+# count.obj <- data.frame(ASV = rownames(count.obj), count.obj, )
 
-identical(rownames(siphonop_ASV0), rownames(count.tbl))
+# nsamples count
+nsamples <- data.frame(nsamples = c(apply(count.obj, 1, function(x) {sum(x > 0)})))
+
+
+identical(rownames(siphonop_ASV0), rownames(count.obj))
 identical(rownames(rabund), rownames(siphonop_ASV0))
+identical(rownames(rabund), rownames(nsamples))
 
-data_map <- data.frame(count.tbl, siphonop_ASV0) # rabund[-1], 
+
+
+data_map <- data.frame(count.obj, siphonop_ASV0) # rabund[-1], nsamples
 
 library(reshape)
 
@@ -547,30 +556,29 @@ list_ASVs <- rownames(out0[out0$Species %in% vector_, ])
 
 list_ASVs0 <- out0[out0[, rank] %in% vector_, TL[5:9]]
 
-count.tbl <- count.tbl0[rownames(count.tbl0) %in% list_ASVs, ]
+count.obj <- count.obj0[rownames(count.obj0) %in% list_ASVs, ]
 
-sample_size <- colSums(count.tbl)
+sample_size <- colSums(count.obj)
 
 # remove samples with abundance of zero
-count.tbl <- count.tbl[sample_size > 0]
+count.obj <- count.obj[sample_size > 0]
 
-# order count.tbl based on the asvs match
-count.tbl <- count.tbl[match(list_ASVs, rownames(count.tbl)),] 
+# order count.obj based on the asvs match
+count.obj <- count.obj[match(list_ASVs, rownames(count.obj)),] 
 
 # ....
 
-# Recortar el numero de muestras en base a  count.tbl[sample_size > 0]
-samples_sbt <- samples[rownames(samples) %in% names(count.tbl),]
-samples_sbt <- samples_sbt[match(names(count.tbl), rownames(samples_sbt)),]
+# Recortar el numero de muestras en base a  count.obj[sample_size > 0]
+samples_sbt <- samples[rownames(samples) %in% names(count.obj),]
+samples_sbt <- samples_sbt[match(names(count.obj), rownames(samples_sbt)),]
 
-names(count.tbl) <- samples_sbt$Station
+names(count.obj) <- samples_sbt$Station
 
-# count.tbl <- data.frame(ASV = rownames(count.tbl), count.tbl, )
+# count.obj <- data.frame(ASV = rownames(count.obj), count.obj, )
 
-identical(rownames(list_ASVs0), rownames(count.tbl))
+identical(rownames(list_ASVs0), rownames(count.obj))
 
-data_map <- data.frame(count.tbl, list_ASVs0)
-
+data_map <- data.frame(count.obj, list_ASVs0)
 
 library(reshape)
 
@@ -609,14 +617,14 @@ ggplot(data_mapm,
         axis.text.x=element_text(angle = 90, hjust = 1))
 ```
 
-```{r}
+```{r alluvial copepodo}
 
 
 
 library(ggalluvial)
 
 
-alluv_in <- Hexanauplia[,TL[5:9]]
+alluv_in <- filter_rank[,TL[5:9]]
 
 alluv_in[is.na(alluv_in)] <- 'Undetermined'
 
@@ -637,5 +645,42 @@ ggplot(data = alluv_long,
   ggtitle("The frequency distribution of zooplankton in the GoM.") +
   xlab("Level of resolution") + ylab("Number of ASVs")
 
-
 ```
+
+```{r arc diagram}
+net_in <- filter_rank[,TL[5:9]]
+
+
+# Transform the adjacency matrix in a long format
+connect <- net_in %>% 
+  gather(key="to", value="value", -1) %>%
+  mutate(to = gsub("\\.", " ",to)) %>%
+  na.omit() 
+
+# Number of connection per person
+c( as.character(connect$from), as.character(connect$to)) %>%
+  as.tibble() %>%
+  group_by(value) %>%
+  summarize(n=n()) -> coauth
+colnames(coauth) <- c("name", "n")
+
+
+require(igraph)
+require(ggraph)
+
+mygraph <- graph_from_data_frame( connect, vertices = coauth, directed = FALSE )
+com <- walktrap.community(mygraph)
+
+#Reorder dataset and make the graph
+coauth <- coauth %>% 
+  mutate( grp = com$membership) %>%
+  arrange(grp) %>%
+  mutate(name=factor(name, name))
+
+ggraph(mygraph, layout="linear") + 
+  geom_edge_arc(edge_colour="black", edge_alpha=0.2, edge_width=0.3, fold=TRUE) +
+  geom_node_point(aes(size=n, color=as.factor(grp), fill=grp), alpha=0.5) +
+  scale_size_continuous(range=c(0.5,8))
+```
+
+
