@@ -17,7 +17,7 @@ rank <- arg[4]
 wang.taxonomy <- 'run014_t2_ASVs.ALL.wang.taxonomy'
 count_tbl <- 'run014_t2_ASVs_count.table'
 fasta_file <- 'run014_t2_ASVs.fasta'
-rank <- 'Phylum'
+rank <- 'Species'
 
 # ------ functions
 

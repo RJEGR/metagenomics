@@ -5,13 +5,54 @@
 
 rm(list = ls())
 
+# test list :
+path <- c('/Users/cigom/metagenomics/db/ncbi_nt_coi/CO1_COI_COX1_COXI_GENE_Eukaryota_nt/CO1_COI_COX1_COXI_GENE_Eukaryota_nr/pcr_seqs_screen')
+
+list_files <- list.files(path = path, pattern = '*.summary', full.names = TRUE)
+
+str(Eukaryota_nr.pcr <- read.delim(list_files[1]))
+str(Eukaryota_nr <- read.delim(list_files[2]))
+str(Eukaryota_nr.unique <- read.delim(list_files[3]))
+
+
+start <- Eukaryota_nr.pcr[, 'start']
+end <- Eukaryota_nr.pcr[, 'end']
+df <- as.data.frame(cbind(start,end))
+
+poss <- vector()
+
+i=1
+for(i in 1:nrow(df)){
+  poss <- append(poss, c(df[i,1]:df[i,2]))
+  i+1
+}
+
+dens <- density(poss)
+
+plot(dens)
+
+
+# Viz blastn ----
+require('ggplot2')
+
+df <- dplyr::select(Eukaryota_nr.pcr, -seqname)
+
+p <- ggplot() +
+  geom_density(data = reshape2::melt(df),
+               mapping = aes(x = value,
+                             y = ..count.. 
+               ), color = "grey") +
+  labs(x = "Position", y = "Freq")
+
+p + facet_wrap( ~ variable, scales = "free")
+
+
 library(ShortRead)
 packageVersion("ShortRead")
 library(Biostrings)
 packageVersion("Biostrings")
 library("PrimerMiner")
 packageVersion("PrimerMiner")
-
 
 
 FWD <- "GGWACWGGWTGAACWGTWTAYCCYCC"  ## FORWARD &

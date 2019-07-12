@@ -122,8 +122,8 @@ Con estas premisa se analizan a continuación algunos aspectos de los grupos má
 * Ostrácodos
 * Eufáusidos
 * Cumáceos
-* Anfipodos
-* Heteropodos
+* Anfípodos
+* Heterópodos
 * Pterópodos
 * Quetognatos
 * Apendicularias
@@ -162,6 +162,7 @@ Algunos géneros de *hidromedusas* que frecuentemente ocurren en ambientes de ti
 $$^{*}$$Géneros encontrado en los archivos de BOLD
 
 ```{r Generos Medusas, fig.align = "center", fig.cap = "Figura 1"}
+
 rank <- 'Genus'
 cnidaria0 <- filter(out0,  Order != 'Siphonophorae')
 cnidaria <- filter(cnidaria0,  Phylum == 'Cnidaria')
@@ -417,9 +418,11 @@ gg <- ggplot() +
 
 coors <- read.csv("~/Downloads/metadata_xiximi06.csv", header=TRUE, stringsAsFactors = FALSE)
 
+coors$Transect <- substr(coors$Station, 1,1)
 
 gg + 
-    geom_point(data = coors, aes(Longitude, Latitude), alpha = 0.7) +
+    geom_point(data = coors, aes(Longitude, Latitude, color = Transect), alpha = 0.7, size = 7) +
+    scale_color_brewer(palette = "RdYlBu") +
     geom_text_repel(data = coors,
                   aes(Longitude, Latitude, label = Station),
                   segment.color = "grey50"
@@ -521,7 +524,6 @@ ggplot(data = alluv_long,
   ggtitle("The frequency distribution of zooplankton in the GoM.") +
   xlab("Level of resolution") + ylab("Number of ASVs")
 ```
-
 
 ## Cladoceros
 
@@ -683,4 +685,188 @@ ggraph(mygraph, layout="linear") +
   scale_size_continuous(range=c(0.5,8))
 ```
 
+```{r Ostracoda}
+lineage <- 'Ostracoda'
 
+filter_rank <- filter(out0, Class == lineage)
+
+data_agg <- data.frame(aglom_ab(filter_rank, rank))
+knitr::kable(data_agg)
+
+# search for count.table agglom
+vector_ <- filter(data_agg, lineage != 'Undetermined')$lineage
+
+list_ASVs <- rownames(out0[out0$Species %in% vector_, ])
+
+list_ASVs0 <- out0[out0[, rank] %in% vector_, c(TL[5:9])] #c(TL[5:9], 'seq_size', 'abund', 'nsamples')
+
+count.obj <- count.obj0[rownames(count.obj0) %in% list_ASVs, ]
+
+sample_size <- colSums(count.obj)
+
+# remove samples with abundance of zero
+count.obj <- count.obj[sample_size > 0]
+
+# order count.obj based on the asvs match
+count.obj <- count.obj[match(list_ASVs, rownames(count.obj)),] 
+
+total <- sum(rowSums(count.obj))
+nreads <- rowSums(count.obj)
+rabund <- data.frame(ASV = names(nreads), rabund = (nreads / total) * 100)
+rabund <- rabund[match(list_ASVs, rownames(rabund)),]
+
+identical(rownames(rabund), rownames(count.obj))
+
+# Recortar el numero de muestras en base a  count.obj[sample_size > 0]
+samples_sbt <- samples[rownames(samples) %in% names(count.obj),]
+samples_sbt <- samples_sbt[match(names(count.obj), rownames(samples_sbt)),]
+
+names(count.obj) <- samples_sbt$Station
+
+# count.obj <- data.frame(ASV = rownames(count.obj), count.obj, )
+
+# nsamples count
+# nsamples <- data.frame(nsamples = c(apply(count.obj, 1, function(x) {sum(x > 0)})))
+
+
+identical(list_ASVs, rownames(count.obj))
+identical(rownames(rabund), list_ASVs)
+identical(rownames(rabund), rownames(nsamples))
+identical(rownames(list_ASVs0), rownames(count.obj))
+
+
+data_map <- data.frame(list_ASVs, count.obj, rabund[-1], list_ASVs0)
+
+# Example of ASV list with same species
+filter(data_map, Species == 'Conchoecetta acuminata')
+```
+
+
+```{r, Ostracoda bubbleplot}
+data_map <- data.frame(count.obj, list_ASVs0)
+data_mapm <- melt(data_map, id.vars =  c(TL[5:9]) ,variable_name = 'Station' )
+
+# remove zero in the file
+data_mapm <- filter(data_mapm, value > 1)
+
+# add transect group
+
+data_mapm$transect <- substr(data_mapm$Station, 1,1)
+
+Species_lev <- unique(data_mapm[order(data_mapm$Species), 'Species'])
+
+data_mapm$Species <- factor(data_mapm$Species, levels = rev(Species_lev))
+
+ggplot(data_mapm, 
+       aes(x = Station, 
+           y = Species)) +
+  geom_point(aes(size=value)) + 
+  #scale_size_continuous(name = 'Reads number', 
+  #                      breaks = c(100, 500, 1000, 1500, 2000),
+  #                      labels = c(' =< 100', '500', '1000', '1500', '2000')) +
+  facet_grid(Order~transect, scales="free", space = 'free') +
+  theme_bw() +
+  theme(
+        axis.title.x=element_blank(),
+        axis.text.x=element_text(angle = 90, hjust = 1))
+```
+
+## megabplot of groups
+
+```{r barplot of groups}
+
+asv_size <- rowSums(count.obj0)
+
+# remove samples with abundance of zero
+
+count.obj <- count.obj0[asv_size > 0, ]
+
+# remove zeros asvs from the data.frame
+
+if(identical(rownames(count.obj0), rownames(out0))){
+  count_tax <- cbind(count.obj0, out0)
+  count_tax <- count_tax[which(asv_size > 0), ]
+}
+
+
+nrow(Rotifera <- filter(count_tax,  Phylum == 'Rotifera')) #0 
+
+# cnidaria0 <- filter(out0,  Order != 'Siphonophorae')
+nrow(Medusas <- filter(count_tax,  Phylum == 'Cnidaria')) # 485, JIC, remove `Order != 'Siphonophorae'`
+nrow(Siphonophorae <- filter(count_tax, Order == 'Siphonophorae')) # 335
+nrow(Ctenophora <- filter(count_tax, Phylum == 'Ctenophora')) # 0
+nrow(Poliqueto <- filter(count_tax, Phylum == 'Annelida')) # 78
+nrow(Branchiopoda <- filter(count_tax, Class == 'Branchiopoda')) # 14
+
+nrow(Copepoda <- filter(count_tax, Class == 'Hexanauplia')) # 4805
+
+nrow(Ostracoda <- filter(count_tax, Class == 'Ostracoda')) # 340
+
+# both are from Malacostraca branch!!
+nrow(Eufasidos <- filter(count_tax, Order == 'Euphausiacea')) # 428
+nrow(Cumaceos <- filter(count_tax, Order == 'Cumacea')) # 0
+# malacostraca <- filter(count_tax, Class == 'Malacostraca' )
+
+
+nrow(Amphipoda <- filter(count_tax, Order == 'Amphipoda')) # 66
+
+nrow(Mollusca <- filter(count_tax, Phylum == 'Mollusca')) # 1131, 
+nrow(Pteropoda <- filter(count_tax, Order == 'Pteropoda')) #0
+
+nrow(Chaetognatha <- filter(count_tax, Phylum == 'Chaetognatha')) # 842
+nrow(Appendicularia <- filter(count_tax, Class == 'Appendicularia')) #0
+nrow(ictioplank <- filter(count_tax, Class == 'Actinopterygii')) # 680
+# prepare to remove Undetermined assigments
+# alluv_in[is.na(alluv_in)] <- 'Undetermined'
+
+# knitr::kable(data.frame(aglom_ab(Chaetognatha, 'Species')))
+
+
+```
+
+```{r}
+# cnidaria0 <- filter(out0,  Order != 'Siphonophorae')
+dim(Medusas$Group <- 'Medusas')  # 485,
+dim(Siphonophorae$Group <- 'Sifonóforos') # 335
+dim(Poliqueto$Group <- 'Poliquetos') # 78
+dim(Branchiopoda$Group <- 'Cladóceros')  # 14
+dim(Copepoda$Group <- 'Copépodos') # 4805
+dim(Ostracoda$Group <- 'Ostrácodos') # 340
+# both are from Malacostraca branch!!
+dim(Eufasidos$Group <- 'Eufáusidos') # 428
+# malacostraca <- filter(count_tax, Class == 'Malacostraca' )
+dim(Amphipoda$Group <- 'Anfipodos') # 66
+dim(Mollusca$Group <- 'Heteropodos') # 1131, 
+dim(Chaetognatha$Group <- 'Quetognatos') # 842
+dim(ictioplank$Group <- 'Ictioplancton') # 680
+
+
+data_vis <- rbind(Medusas, Siphonophorae, Poliqueto, Branchiopoda, Copepoda,
+                  Ostracoda, Eufasidos, Amphipoda, Mollusca, Chaetognatha,  ictioplank)
+
+data_vis <- select(data_vis, c(names(count.obj), 'nsamples', 'seq_size', 'Group'))
+
+data_vis_pct <- data.frame(
+  apply(data_vis[names(count.obj)], 2, FUN =  function(x) { x / sum(x) * 100}),
+        select(data_vis, nsamples, seq_size, Group))
+
+# data_vis_pct <- round(data_vis_pct, digits = 3)
+
+data_vis_m <- melt(data_vis_pct, id.vars = c('nsamples', 'seq_size', 'Group') )
+
+data_vis_m <- filter(data_vis_m, value > 0.01)
+data_vis_m$transect <- substr(data_vis_m$variable, 1,1)
+data_vis_m$Samples <- substr(data_vis_m$variable, 1,3)
+
+
+ggplot(data_vis_m,  aes(Samples, value, fill = Group, group = Group)) +
+  geom_col(width = 0.4, position = position_stack(), alpha = 0.7) +
+  scale_fill_brewer(palette = "Paired") + coord_flip() +
+  #geom_text(aes(label = Size, color = DataBase), size = 3, position = position_dodge(width = 0.5)) +
+  scale_color_brewer(palette = "Paired") +
+  facet_wrap(~transect, scales="free") +
+  theme_bw(base_size=12) +
+  labs(y = 'n Reads',
+    title = '')
+
+```
