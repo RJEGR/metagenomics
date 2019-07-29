@@ -1,15 +1,18 @@
 fl <- fnFs
 f <- fl
-plotQualityProfile
-function (fl, n = 5e+05, aggregate = FALSE) 
-{
-    statdf <- data.frame(Cycle = integer(0), Mean = numeric(0), 
+# plotQualityProfile
+#function (fl, n = 5e+05, aggregate = FALSE) 
+#{
+n = 5e+05
+statdf <- data.frame(Cycle = integer(0), Mean = numeric(0), 
         Q25 = numeric(0), Q50 = numeric(0), Q75 = numeric(0), 
         Cum = numeric(0), file = character(0))
-    anndf <- data.frame(minScore = numeric(0), label = character(0), 
+anndf <- data.frame(minScore = numeric(0), label = character(0), 
         rclabel = character(0), rc = numeric(0), file = character(0))
-    FIRST <- TRUE
-    for (f in fl[!is.na(fl)]) {
+
+FIRST <- TRUE
+    
+for (f in fl[!is.na(fl)]) {
 library(ShortRead)
         srqa <- qa(f, n = n)
         df <- srqa[["perCycle"]]$quality
@@ -82,7 +85,12 @@ library(ShortRead)
                 sum(anndf$rc)), color = "red", hjust = 0) + theme_bw() + 
             theme(panel.grid = element_blank()) + guides(fill = FALSE) + 
             facet_wrap(~label) + ylim(c(0, NA))
-        if (length(unique(statdf$Cum)) > 1) {
+        if (p <- p + geom_line(data = statdf.summary, aes(y = Cum/nrow(anndf)), 
+                               color = "red", size = 0.25, linetype = "solid") + 
+            scale_y_continuous(sec.axis = sec_axis(~. * 10, 
+                                                   breaks = c(0, 100), labels = c("0%", "100%"))) + 
+            theme(axis.text.y.right = element_text(color = "red"), 
+                  axis.title.y.right = element_text(color = "red"))) > 1) {
             p <- p + geom_line(data = statdf.summary, aes(y = Cum/nrow(anndf)), 
                 color = "red", size = 0.25, linetype = "solid") + 
                 scale_y_continuous(sec.axis = sec_axis(~. * 10, 

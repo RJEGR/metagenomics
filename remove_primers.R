@@ -31,7 +31,6 @@ dens <- density(poss)
 
 plot(dens)
 
-
 # Viz blastn ----
 require('ggplot2')
 
