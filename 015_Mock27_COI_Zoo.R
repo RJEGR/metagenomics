@@ -78,7 +78,7 @@ out_path = paste0(dir, '/dada2_asv')
 fnFs <- sort(list.files(data_path, pattern = "015-Mock27-COI-Zoo_S56_L001_R1_001.fastq.gz", full.names = T))
 fnRs <- sort(list.files(data_path, pattern = "015-Mock27-COI-Zoo_S56_L001_R2_001.fastq.gz", full.names = T))
 
-plotQualityProfile(list.files(data_path, pattern = 'fastq.gz', full.names = TRUE))
+plotQP(list.files(data_path, pattern = 'fastq.gz', full.names = TRUE))
 
 filtFs <- file.path(out_path, paste0("015-Mock27-COI-Zoo_F_filt.fastq"))
 filtRs <- file.path(out_path, paste0("015-Mock27-COI-Zoo_R_filt.fastq"))
@@ -91,7 +91,7 @@ out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs,
                      trimLeft = 26, maxN = 0, 
                      rm.phix = rm_phix, compress = T, multithread = T)
 
-plotQualityProfile(list.files(out_path, pattern = 'filt.fastq', full.names = TRUE)) + theme_classic(base_size = 16)
+plotQP(list.files(out_path, pattern = 'filt.fastq', full.names = TRUE))
 
 # Dereplication ----
 derepFs <- derepFastq(filtFs, verbose = T)
@@ -121,7 +121,7 @@ nrow(mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs,
 
 
 
-seqtab <- makeSequenceTable(mergers)
+dim(seqtab <- makeSequenceTable(mergers))
 
 seqtab.nochim <- removeBimeraDenovo(seqtab, method = "consensus", multithread = threads, verbose = T)
 
@@ -200,10 +200,12 @@ ggplot(data = alluv_long,
            label = stratum)) +
   geom_stratum() + 
   geom_text(stat = "stratum", size = 2.5) +
-  geom_flow(aes(fill = alluvium), stat = "alluvium",
+  geom_flow( stat = "alluvium", # aes(fill = alluvium),
             aes.bind = TRUE, lode.guidance = "rightward") +
   theme_minimal() +
   ggtitle("The frequency distribution of zooplankton in the Mock-015") +
   xlab("Level of resolution") + ylab("Number of ASVs")
 
+#
+agg_species <- aglom_ab(out0, 'Species')
 
