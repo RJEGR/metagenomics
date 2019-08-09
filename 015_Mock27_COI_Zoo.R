@@ -25,6 +25,7 @@ learn_Err <- function(x) { learnErrors(x,
 
 # setdir ----
 dir <- '/Users/cigom/metagenomics/COI/run15'
+
 setwd(dir)
 # 
 ## Checking and Load packages ----
@@ -78,10 +79,16 @@ out_path = paste0(dir, '/dada2_asv')
 fnFs <- sort(list.files(data_path, pattern = "015-Mock27-COI-Zoo_S56_L001_R1_001.fastq.gz", full.names = T))
 fnRs <- sort(list.files(data_path, pattern = "015-Mock27-COI-Zoo_S56_L001_R2_001.fastq.gz", full.names = T))
 
+source('~/Documents/GitHub/metagenomics/plotQualityProfile.R')
+
 plotQP(list.files(data_path, pattern = 'fastq.gz', full.names = TRUE))
 
 filtFs <- file.path(out_path, paste0("015-Mock27-COI-Zoo_F_filt.fastq"))
 filtRs <- file.path(out_path, paste0("015-Mock27-COI-Zoo_R_filt.fastq"))
+
+
+fat_trunclen <- c(220, 180)
+fat_maxee <- c(2,4)
 
 out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs,
                      truncLen = fat_trunclen, 
@@ -90,6 +97,9 @@ out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs,
                      minLen = fat_minlen,
                      trimLeft = 26, maxN = 0, 
                      rm.phix = rm_phix, compress = T, multithread = T)
+
+
+pct_trim <- 1 - out[2]/out[1]
 
 plotQP(list.files(out_path, pattern = 'filt.fastq', full.names = TRUE))
 

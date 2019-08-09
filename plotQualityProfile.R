@@ -7,7 +7,7 @@ plotQP <- function (fl, n = 5e+05, aggregate = FALSE)
                       rclabel = character(0), rc = numeric(0), file = character(0))
   FIRST <- TRUE
   for (f in fl[!is.na(fl)]) {
-    srqa <- qa(f, n = n)
+    srqa <- ShortRead::qa(f, n = n)
     df <- srqa[["perCycle"]]$quality
     rc <- sum(srqa[["readCounts"]]$read)
     if (rc >= n) {
