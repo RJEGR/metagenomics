@@ -5,10 +5,10 @@
 # training carried out by:
 # LearnTaxa and testing with IdTaxa
 # How to use: Rscript --vanilla IDTaxa.R input[string] reference[string] taxonomy[string] threshold[interger - by default 99]
-# reference are fasta format of sequence references 
+# reference and input are fasta format of sequence references 
 # taxonomy are assignments for sequences embed in the reference file; two columns as in rdp-mothur format (';' separated ranks-by-rank)
 ## >> Note: All elements of taxonomy must contain 'Root;'
-
+# Example:
 # Rscript --vanilla IDTaxa.R run012_relax_ASVs.P68.worms.fasta BOLD_public_species.fasta BOLD_public_species.tax.Root 80
 ## Clean workspace
 rm(list=ls()); 
@@ -158,8 +158,8 @@ for (i in seq_len(maxIterations)) {
 
 # View training results:
 
-trainingSet
-plot(trainingSet)
+#trainingSet
+#plot(trainingSet)
 
 #
 # Classifying Sequences: ----
@@ -180,7 +180,7 @@ ids <- IdTaxa(q_seqs,
 #ids[c(10, 25)]
 #c(ids[10], ids[25])
 
-plot(ids, trainingSet)
+#plot(ids, trainingSet)
 
 # subset any rank
 rank <- sapply(ids,
