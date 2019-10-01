@@ -64,11 +64,11 @@ boots_rdp <- function(taxonomy.file) {
   boots0 <- sapply(tax.split, "[", c(1:max.rank)) # Using the max rank assignation to names the taxonomy object
   boots0 <- as.data.frame(t(boots0))
   
-  boots <- as.data.frame(apply(taxonomy, 2, function(x) gsub("[A-z||()]", "",  x, perl=TRUE)), stringsAsFactors = F)
-  boots <- apply(boots, 2, as.numeric)
-  boots <- data.frame(boots)
-  boots.obj[which(is.na(boots$V9)), 2]
-  boots[is.na(boots)] <- 0
+  boots <- as.data.frame(apply(boots0, 2, function(x) gsub("[A-z||()]", "",  x, perl=TRUE)), stringsAsFactors = F)
+  #boots <- apply(boots, 2, as.numeric)
+  #boots <- data.frame(boots)
+  #boots.obj[which(is.na(boots$V9)), 2]
+  #boots[is.na(boots)] <- 0
   
   rownames(boots) <- boots.obj[,1]
   
