@@ -2,6 +2,7 @@ plotQP <- function (fl, n = 5e+05, aggregate = FALSE)
 {
   .packages <- c("ggplot2")
   sapply(.packages, require, character.only = TRUE)
+  
   statdf <- data.frame(Cycle = integer(0), Mean = numeric(0), 
                        Q25 = numeric(0), Q50 = numeric(0), Q75 = numeric(0), 
                        Cum = numeric(0), file = character(0))
