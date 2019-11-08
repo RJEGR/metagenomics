@@ -91,7 +91,7 @@ bbold <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, x_y_rank = 
   
   require(Biostrings)
   
-  x <- y$ASV
+  x <- y[1]
   db_subset <- x[!duplicated(x)]
   # 1) abundance ----
   
@@ -280,10 +280,10 @@ rank_n <- function(x) {
 # bbold single version
 
 bbold_ <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = TRUE) {
-  
+  options(stringsAsFactors = FALSE)
   require(Biostrings)
   
-  x <- y$ASV
+  x <- c(y[1])
   db_subset <- as.character(x[!duplicated(x)])
   # 1) abundance ----
   
@@ -307,8 +307,8 @@ bbold_ <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = T
   if(identical(rownames(rabund0), db_subset)) {
     if(identical(rownames(nsamples), db_subset)) {
       
-      count.tbl <- data.frame(ASV = rownames(count.tbl0)[which(rownames(count.tbl0) %in% db_subset)],
-                              abund = rabund0$rabund,  nsamples)
+      count.tbl <- data.frame(ASV = rownames(count.tbl0)[which(rownames(count.tbl0) %in% db_subset)], abund = rabund0$rabund,  nsamples)
+      
       count.tbl <- count.tbl[match(db_subset, count.tbl$ASV),]
       
     }
