@@ -31,9 +31,10 @@ out <- lapply(nms, bold_seq)
 # PUBLIC DATA PORTAL - BIN LIST
 # http://boldsystems.org/index.php/Public_BINSearch?query=Mexico
 
+library(tidyverse)
 dir <- '/Users/cigom/metagenomics/COI/BOLD_SYSTEM_MEX/'
 
-tbl <- read_delim(paste0(dir, 'bold_data_mex.txt'), delim = '\t')
+tbl <- readr::read_delim(paste0(dir, 'bold_data_mex.txt'), delim = '\t')
 
 # filter only COI records
 # c('COII', 'COXIII', 'COI-3P')
