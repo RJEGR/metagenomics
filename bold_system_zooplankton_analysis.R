@@ -4,28 +4,6 @@
 
 rm(list = ls())
 
-#install.packages("bold")
-require('bold')
-citation(package = 'bold')
-
-dim(res <- bold_specimens(taxon='Cumacea')) # heavy data
-
-head(res[,1:8])
-
-dim(res <- bold_specimens(taxon='Cumacea'))
-
-# large data
-library("taxize")
-
-x <- downstream("Arthropoda", db = "ncbi", downto = "class")
-
-nms <- x$Arthropoda$childtaxa_name
-
-checks <- bold_tax_name(nms)
-
-# all is good
-checks[,1:5]
-out <- lapply(nms, bold_seq)
 
 # or from
 # PUBLIC DATA PORTAL - BIN LIST
@@ -152,7 +130,4 @@ head(markercode <- markercode[order(markercode$Freq, decreasing = TRUE),])
 # 1 COI-3P   190
 # 3   COII     2
 # 4 COXIII     2
-
-# 
-
 
