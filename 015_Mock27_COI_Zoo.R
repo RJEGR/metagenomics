@@ -100,6 +100,7 @@ out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs,
 
 
 pct_trim <- 1 - out[2]/out[1]
+pct_trim
 
 plotQP(list.files(out_path, pattern = 'filt.fastq', full.names = TRUE))
 
@@ -113,7 +114,7 @@ MAX_CONSIST <- 20
 errF <- learn_Err(filtFs)
 errR <- learn_Err(filtRs)
 
-# plotErrors(errF, nominalQ=TRUE)
+plotErrors(errF, nominalQ=TRUE)
 
 # dada algorithm
 OMEGA_A <- 1e-120
@@ -133,17 +134,47 @@ nrow(mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs,
 
 dim(seqtab <- makeSequenceTable(mergers))
 
-seqtab.nochim <- removeBimeraDenovo(seqtab, method = "consensus", multithread = threads, verbose = T)
+table(nchar(getSequences(seqtab)))
+
+seqtab2 <- t(seqtab[,nchar(colnames(seqtab)) %in% seq(300,320)])
+
+table(nchar(getSequences(seqtab2)))
+# 
+seqtab.nochim <- removeBimeraDenovo(seqtab2, method = "consensus", multithread = threads, verbose = T)
+
+# Distribution of Lengths
+len_df <- data.frame(nchar(getSequences(seqtab2)))
+names(len_df) <- c("Length")
+len_df$Process <- "Initial"
+
+newlen_df <- data.frame(nchar(getSequences(seqtab.nochim)))
+names(newlen_df) <- c("Length")
+newlen_df$Process <- "Nochim"
+
+# Prepare data and plot histogram
+lens_df <- rbind(len_df, newlen_df)
+
+
+lens_plot <- ggplot(lens_df, aes(Length, color=Process)) + 
+  geom_freqpoly(binwidth=1, size=1, alpha=0.7) +
+  scale_color_manual(values = c("#999999", "#E7B800"))+ 
+  labs(title=paste0(". ESVs length distribution")) +
+  theme_minimal() +
+  theme(legend.position = c(0.05,0.95),
+        legend.justification = c(0,1)) + geom_vline(xintercept = qlens, linetype="dotted") #xlim(c(300,320))
+
+lens_plot
+#lens_plot +facet_wrap(~ group)
+
 
 # write data ----
-asv_seqs <- colnames(seqtab.nochim)
-n_asv <- dim(seqtab.nochim)[2]
+asv_seqs <- getSequences(seqtab.nochim)
+n_asv <- length(seqtab.nochim)
 asv_headers <- vector(n_asv, mode="character")
 
 for (i in 1:n_asv) {
   asv_headers[i] <- paste(">ASV", i, sep="_")
 }
-
 
 asv_tab <- t(seqtab.nochim)
 row.names(asv_tab) <- sub(">", "", asv_headers)

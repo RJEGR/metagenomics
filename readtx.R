@@ -280,10 +280,11 @@ rank_n <- function(x) {
 # bbold single version
 
 bbold_ <- function(y, fasta_file = fasta_file, count_tbl = count_tbl, rel_ab = TRUE) {
+  
   options(stringsAsFactors = FALSE)
   require(Biostrings)
   
-  x <- c(y[1])
+  x <- y[,1]
   db_subset <- as.character(x[!duplicated(x)])
   # 1) abundance ----
   

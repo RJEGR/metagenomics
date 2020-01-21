@@ -6,7 +6,7 @@
 rm(list = ls())
 
 # test list :
-path <- c('/Users/cigom/metagenomics/db/ncbi_nt_coi/CO1_COI_COX1_COXI_GENE_Eukaryota_nt/CO1_COI_COX1_COXI_GENE_Eukaryota_nr/pcr_seqs_screen')
+path <- c('/Users/cigom/metagenomics/db/ncbi_nt_coi/CO1_COI_COX1_COXI_GENE_Eukaryota_nt/CO1_COI_COX1_COXI_GENE_Eukaryota_nr/pcr_seqs_screen/')
 
 list_files <- list.files(path = path, pattern = '*.summary', full.names = TRUE)
 
@@ -82,17 +82,23 @@ REV.orients <- allOrients(REV)
 
 # 2
 
-primerHits <- function(primer, seqs) {
+primerHits <- function(primer, fn) {
     # Counts number of reads in which the primer is found
     nhits <- vcountPattern(primer, sread(readFasta(fasta.file)), fixed = FALSE)
     return(sum(nhits > 0))
 }
 # Sanity check
-rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, seqs = fasta.file), 
-    FWD.ReverseReads = sapply(FWD.orients, primerHits, seqs = fasta.file), 
-    REV.ForwardReads = sapply(REV.orients, primerHits, seqs = fasta.file), 
-    REV.ReverseReads = sapply(REV.orients, primerHits, seqs = fasta.file))
+rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, fn = fasta.file), 
+    FWD.ReverseReads = sapply(FWD.orients, primerHits, fn = fasta.file), 
+    REV.ForwardReads = sapply(REV.orients, primerHits, fn = fasta.file), 
+    REV.ReverseReads = sapply(REV.orients, primerHits, fn = fasta.file))
 # 
+
+primerHits <- function(primer, fn) {
+  # Counts number of reads in which the primer is found
+  nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
+  return(sum(nhits > 0))
+}
 alignment <- DECIPHER::AlignSeqs(DNAStringSet(seqs), anchor=NA)
 
 out_align <- data.frame(alignment)

@@ -1,15 +1,15 @@
 
 # Author: Ricardo Gomez-Reyes | modified from: Erik S. Wright (2018) - Classify Sequences
 
-# The classification process is split into two parts: 
+# The classification process is split into two parts:
 # training carried out by:
 # LearnTaxa and testing with IdTaxa
 # How to use: Rscript --vanilla IDTaxa.R input[string] reference[string] taxonomy[string] threshold[interger - by default 99]
-# reference and input are fasta format of sequence references 
+# reference and input are fasta format of sequence references
 # taxonomy are assignments for sequences embed in the reference file; two columns as in rdp-mothur format (';' separated ranks-by-rank)
-## >> Note: All elements of taxonomy must contain 'Root;'
+## >> Note: All elements of taxonomy must contain 'root;'
 # Example:
-# Rscript --vanilla IDTaxa.R run012_relax_ASVs.P68.worms.fasta BOLD_public_species.fasta BOLD_public_species.tax.Root 80
+# Rscript --vanilla IDTaxa.R run012_relax_ASVs.P68.worms.fasta BOLD_public_species.fasta BOLD_public_species.tax.root 80
 ## Clean workspace
 rm(list=ls()); 
 
@@ -44,7 +44,7 @@ seqs_path <- paste0(path, "/", seqs_name)
 
 # taxonomy assigments path
 # tax_name <- 'IctiosConsenso.tax'
-# tax_name <- 'BOLD_public_species.tax.Root'
+# tax_name <- 'BOLD_public_species.tax.root'
 tax_path <- paste0(path, "/", tax_name)
 
 #
@@ -83,12 +83,12 @@ taxonomy <- read.table(tax_path, header = FALSE, stringsAsFactors = FALSE)
 if (identical(taxonomy$V1, names(seqs))) {
                names(seqs) <- taxonomy$V2
                groups <- names(seqs)
-               groups <- gsub("(.*)(Root;)", "\\2", groups)
+               groups <- gsub("(.*)(root;)", "\\2", groups)
                groupCounts <- table(groups)
                cat("number of groups in reference are:\n", length(u_groups <- names(groupCounts)))
     } else {
                groups <- taxonomy$V2
-               groups <- gsub("(.*)(Root;)", "\\2", groups)
+               groups <- gsub("(.*)(root;)", "\\2", groups)
                groupCounts <- table(groups)
                cat("number of groups in reference are:\n", length(u_groups <- names(groupCounts)))
                }
@@ -185,7 +185,7 @@ ids <- IdTaxa(q_seqs,
 # subset any rank
 rank <- sapply(ids,
                  function(x) {
-                   w <- which(x$rank=="Root")
+                   w <- which(x$rank=="root")
                    if (length(w) != 1) {
                      "unknown"
                    } else {

@@ -144,16 +144,14 @@ rqcCycleBaseCallsPlot(qa)
 
 
 # Qual_vs_MaxEE_plot
-data_path <- '/Users/cigom/metagenomics/COI/run15/'
-fileqc <- list.files(data_path, pattern = 'zip', full.names = TRUE)
+data_path <- '/Users/cigom/metagenomics/COI/run012/quality/no_group/'
+fileqc <- list.files(data_path, pattern = '*zip', full.names = TRUE)
 fastq.r1 <- fileqc[1]
 fastq.r2 <- fileqc[2]
-source(qualMaxEEplot.R)
+source('https://raw.githubusercontent.com/RJEGR/infovis/master/qualMaxEEplot.R')
 qualMaxEEplot(fastq.r1 = fastq.r1, fastq.r2 = fastq.r2)
 
 # fastqc --nogroup yourFastqFile_R1.fastq yourFastqFile_R2.fastq
-# From the fastQC output file:
-# sed -n '/>>Per\sbase\ssequence\squality/,/>>END_MODULE/p' fastqc_data.txt  | sed '1d;$d' > fastq.qual.csv
 
 
 
