@@ -1,7 +1,7 @@
-read_rdp <- function(taxonomy.file) {
+read_rdp <- function(taxonomy.file, header = FALSE) {
   .cran_packages <- c('stringr', 'dplyr')
   sapply(c(.cran_packages), require, character.only = TRUE, quietly = TRUE)
-  taxonomy.obj <- read.csv(taxonomy.file, header=FALSE, sep="\t", stringsAsFactors=FALSE)
+  taxonomy.obj <- read.csv(taxonomy.file, header=header, sep="\t", stringsAsFactors=FALSE)
   tax.split <- strsplit(taxonomy.obj[, ncol(taxonomy.obj)], ";")
   
   # Using the max rank assignation to names the taxonomy object
