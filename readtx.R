@@ -11,7 +11,7 @@ read_rdp <- function(taxonomy.file, header = FALSE) {
   tax <- as.data.frame(apply(taxonomy, 2, function(x) gsub("\\(.*$", "",  x, perl=TRUE)), stringsAsFactors = F)
   
   # Remove unclassified and replace underscores by spaces
-  tax <- mutate_all(data.frame(tax), funs(str_replace_all(., c(".+_unclassified"=NA_character_, "_"=" ", "Unclassified"=NA_character_, "NA"=NA_character_))))
+  tax <- mutate_all(data.frame(tax), funs(str_replace_all(., c(".+_unclassified"=NA_character_, "_"=" ", "Unclassified"=NA_character_, "NA"=NA_character_, "sp."=NA_character_, "Undetermined"=NA_character_, "Unknown"=NA_character_))))
   rownames(tax) <- taxonomy.obj[,1]
   
   # if(tax[,1] == 'root') {
@@ -29,23 +29,23 @@ read_rdp <- function(taxonomy.file, header = FALSE) {
   
   # colnames(tax) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
   max.rank <-  ncol(tax) -1 
-  # Tag starting level (SL) (aka calculate resolution)
-  tax$SL <- max.rank
+  # Tag starting level (Resolution) (aka calculate resolution)
+  tax$Resolution <- max.rank
   
   for(t in max.rank:2){
     rr <- t-1  #rank real 
     rc <- t+1  #column-index (rank) para corregir
     if(t == max.rank){
-      tax$SL[is.na(tax[,rc])] <- rr
+      tax$Resolution[is.na(tax[,rc])] <- rr
     } else {
-      tax$SL[is.na(tax[,rc]) & tax$SL <= t ] <- rr
+      tax$Resolution[is.na(tax[,rc]) & tax$Resolution <= t ] <- rr
     }
   }
   
-  # tax$SL_rank <- 'rank'
+  # tax$Resolution_rank <- 'rank'
   # for (i in 1:nrow(tax)) {
-  #   rl <- tax$SL[i] + 1
-  #   tax$SL_rank[i] <- names(tax)[rl] }
+  #   rl <- tax$Resolution[i] + 1
+  #   tax$Resolution_rank[i] <- names(tax)[rl] }
   
   return(tax) 
   
@@ -224,23 +224,23 @@ aglom_ab <- function(x,rank) {
 
 # agglomerate nsamples per rank and add children level to rank (REMOVE)
 
-# get back the last rank based on the SL ----
+# get back the last rank based on the Resolution ----
 
 lrank <- function(x) {
   x_ <- NULL
   for (i in 1:nrow(x)) {
-    rl <- x$SL[i] + 1
+    rl <- x$Resolution[i] + 1
     x_[[i]] <- names(x)[rl]
   }
   return(x_)
 }
 
-# get back the last lineage based on the SL  ----
+# get back the last lineage based on the Resolution  ----
 
 llineage <- function(x) {
   x_ <- NULL
   for (i in 1:nrow(x)) {
-    rl <- x$SL[i] + 1
+    rl <- x$Resolution[i] + 1
     # x_[[i]] <- list(rank=names(x)[rl], linage=x[i,rl]) }
     x_[[i]] <- x[i,rl]
   }
