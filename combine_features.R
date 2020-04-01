@@ -1,9 +1,10 @@
 
 # Ricardo Gomez-Reyes, March, 2020
-# 1. 
+# 1. Read and combine data
 # 2. Detect low-abundance (laf) features ----
 # 3. Clean non-animal taxonomy ----
 # 4. Filter laf and out file -----
+# 5. Test visualizations
 
 rm(list=ls())
 
@@ -38,10 +39,8 @@ Ranks <- list(root = sym("Rank_1"), Dominio=sym("Rank_2"),
              Clase=sym("Rank_5"), Orden=sym("Rank_6"), 
              Familia=sym("Rank_7"), Genero=sym("Rank_8"),
              Especie=sym("Rank_9"))
-  
-}
 
-# Funcions ----
+# Funcions (mover a ) ----
 combine_features <- function(count_tbl, tax_tbl, k = 1, tax_header = TRUE) {
   
   require(data.table)
@@ -92,6 +91,7 @@ combine_features <- function(count_tbl, tax_tbl, k = 1, tax_header = TRUE) {
   
 }
 
+
 # SILVA ----
 # Silva ranking format
 Ranks <- list(Reino=sym("Rank_1"), Filo=sym("Rank_2"), 
@@ -125,8 +125,10 @@ write.table(out_bold, file = paste0(path,'/','combine_tax_count_format2.txt' ))
 
 
 
+# 5. Test visualizations -----
 # para dar continuidad al combine, estaria bien meter algunas visualizaciones. etc.
 others <- data.table(out_silva$others)
+animalia <- data.table(out_silva$complete)
 
 table(others$Resolution)
 
@@ -143,4 +145,9 @@ aglom_ab <- function(x, rank) {
   return(tax_out)
 }
 
-aglom_ab(others, rank = 'Reino')
+aglom_ab(others, rank = 'Genero')
+
+# obtener un indice de 'peso' que nos deje saber la contribucion de los features para alcanzar dicha abundancia. pj fsize y nsams de estos 7 features del mismo genero
+
+others[others$Genero == 'Acanthometra']
+
