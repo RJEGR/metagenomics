@@ -11,7 +11,8 @@
 # tax <- lulu.trim.contigs.good.unique.pick.good.filter.unique.precluster.pick.opti_mcc.unique_list.0.03.cons.taxonomy
 # path <- 
 
-# run diversity, ktones distributon and abundant tax group, a
+# run diversity, ktones distributon and abundant tax group, 
+# Remove not animalia!!!nhuy7                                                                                                                                     
 
 
 # Set colors
@@ -30,6 +31,95 @@ out_path <- '~/metagenomics/'
 url <- 'https://raw.githubusercontent.com/RJEGR/metagenomics/master/readtx.R'
 source(url)
 
+draw_res <- function(tax_table, count_table, rank = names(tax_table)[1]) {
+  
+  abundance <- rowSums(count_table)
+  tax_rank <- tax_table[, rank]
+  
+  res <- names(tax_table)[ncol(tax_table)] # Last column shoud be SL
+  resolution <- tax_table[, res]
+  
+  out <- data.frame(Abundance = abundance, Rank = tax_rank, 
+                    Resolution = resolution, stringsAsFactors = FALSE)
+  
+  names(out)[2] <- rank
+  names(out)[3] <- res
+  
+  nr <- aggregate(out[,'Abundance'], by=list(out[,rank], out[, res]), FUN = sum)
+  
+  nf <- aggregate(out[,'Abundance'], by = list(out[,rank], out[, res]), FUN = length)
+  
+  total_reads <- sum(abundance)
+  total_features <- nrow(out)
+
+  # include percent later, 2/04/20
+  #pct <- function(x) {round((x / sum(x) * 100), 2)}
+  
+  #pct_r <- aggregate(out[,'Abundance'], by=list(out[,rank], out[, res]), FUN = pct)
+  #pct_f <- aggregate(out[,'Abundance'], by = list(out[,rank], out[, res]), FUN = length)
+  
+  if(identical(nr[,1], nf[,1])) {
+    
+    n <- data.frame(Rank = nr[,1],
+                    Resolution = nr[,2],
+                    Abundance = nr[,3],
+                    features = nf[,3])
+    
+    names(n)[1] <- rank
+    
+  } else
+    n <- data.frame(Rank = nr[,1],
+                    Resolution = nr[,2],
+                    Abundance = nr[,3],
+                    features = nf[,3])
+  
+  #n$pct_a <- round((nr[,3] / total_reads) * 100, 2)
+  
+  return(n)
+}
+
+
+
+draw_rank <- function(tax_table, count_table, rank = names(tax_table)[1]) {
+  
+  abundance <- rowSums(count_table)
+  tax_rank <- tax_table[, rank]
+    
+  out <- data.frame(Abundance = abundance, Rank = tax_rank, stringsAsFactors = FALSE)
+  
+  names(out)[2] <- rank
+  
+  nr <- aggregate(out[,'Abundance'],
+                  by=list(out[,rank]), FUN = sum)
+  
+  # n_features <- function(x) {length(unique(x))}
+  
+  nf <- aggregate(out[,'Abundance'], by = list(out[,rank]), FUN = length)
+  
+  total_reads <- sum(abundance)
+  total_features <- nrow(out)
+  
+  pct_r <- round(nr[,2] / total_reads * 100, 3)
+  pct_f <- round(nf[,2] / total_features * 100, 3) # features percent
+  
+  if(identical(nr[,1], nf[,1])) {
+    
+    n <- data.frame(Rank = nr[,1],
+                    abundance = nr[,2], 
+                    pct_a = pct_r, 
+                    features = nf[,2],
+                    pct_f = pct_f)
+    
+    names(n)[1] <- rank
+    
+  } else
+    n <- data.frame(Rank = nr[,1],
+                    abundance = nr[,2], 
+                    pct_r = pct_r, 
+                    features = nf[,2],
+                    pct_f = pct_f) 
+  return(n)
+}
 
 reads_n_features <- function(physeq, ktone = 1, ...) {
   
@@ -74,6 +164,7 @@ reads_n_features <- function(physeq, ktone = 1, ...) {
   return(n)
   
 }
+
 # Set counts tables ----
 c1 <- paste0(p1 ,'/','lulu.trim.contigs.good.unique.pick.good.filter.unique.precluster.pick.opti_mcc.unique_list.shared')
 
@@ -87,12 +178,12 @@ t2 <- paste0(p2, '/','multirun_XIXIM_18S_PE_rep_seqs.w2pr2_worms_API02.wang.taxo
 
 # Load data ----
 # count table (c)
-c_otus <- read.table(c1)
+c_otus0 <- read.table(c1)
 
 library(biomformat)
 
-c_asvs <- read_biom(c2)
-c_asvs <- data.frame(as(biom_data(c_asvs), "matrix"))
+c_asvs0 <- read_biom(c2)
+c_asvs0 <- data.frame(as(biom_data(c_asvs0), "matrix"))
 
 # taxonomy (t)
 read_rdp2 <- function(file, header = T) {
@@ -110,15 +201,85 @@ read_rdp2 <- function(file, header = T) {
   return(tax)
 }
 
-dim(t_otus <- read_rdp2(t1, header = T))
-dim(t_asvs <- read_rdp2(t2, header = F))
+dim(t_otus0 <- read_rdp2(t1, header = T))
+dim(t_asvs0 <- read_rdp2(t2, header = F))
+
+#Subset animalioa before everything:
+
+animalia_otus <- rownames(t_otus0[t_otus0$Kingdom == 'Animalia', ])
+animalia_asvs <- rownames(t_asvs0[t_asvs0$Kingdom == 'Animalia', ])
+
+# count
+dim(c_otus <- c_otus0[rownames(c_otus0) %in% animalia_otus,])
+dim(c_asvs <- c_asvs0[rownames(c_asvs0) %in% animalia_asvs,])
+# tax
+dim(t_otus <- t_otus0[rownames(t_otus0) %in% animalia_otus,])
+dim(t_asvs <- t_asvs0[rownames(t_asvs0) %in% animalia_asvs,])
+
+# Draw kingdoms fractions ----
+
+d1 <- data.frame(draw_rank(t_otus0, c_otus0), Strategy = 'OTU')
+d2 <- data.frame(draw_rank(t_asvs0, c_asvs0), Strategy = 'ASV')
+
+# d1 %>% 
+#   select(Kingdom, pct_a) %>%
+#   pivot_wider(names_from = Kingdom, values_from = pct_a) -> d1
+# d2 %>% 
+#   select(Kingdom, pct_a) %>%
+#   pivot_wider(names_from = Kingdom, values_from = pct_a) -> d2
+
+draw1 <- rbind(d1, d2)
+
+library(tidyr)
+library(ggradar)
+library(scales)
+library(tibble)
+
+download.file("https://github.com/ricardo-bion/ggtech/blob/master/Circular%20Air-Light%203.46.45%20PM.ttf", "~/Circular Air-Light 3.46.45 PM.ttf", method = "curl")
+
+# extrafont::font_import(paths = "~/", pattern = 'Circular', prompt = FALSE)
+
+draw1 %>% 
+  select(-abundance, -features, -pct_f) %>%
+  pivot_wider(names_from = Kingdom, values_from = pct_a
+              # values_fill = list( pct_a = 0)
+              ) -> draw_kingdom_tbl
+  # mutate_at(vars(-Strategy), rescale) %>%
+  # ggradar()
+
+# or by resolution
+d1 <- data.frame(draw_res(t_otus0, c_otus0), Strategy = 'OTU') 
+d2 <- data.frame(draw_res(t_asvs0, c_asvs0), Strategy = 'ASV')
+
+# Sanity check: 
+# el acumulado de los niveles debe dar el total de reads y tamano de features
+colSums(select(d2, -Kingdom, -Strategy, -Resolution))
+colSums(select(d1, -Kingdom, -Strategy, -Resolution))
+
+draw2 <- rbind(d1, d2)
+
+draw2 %>%
+  select(-features) %>%
+  pivot_wider(names_from = Kingdom, values_from = Abundance, 
+              values_fill = list( Abundance = 0)) %>%
+  mutate_at(vars(-Resolution,-Strategy), rescale)
+
+ggplot(draw2, aes(x = Resolution, y = Abundance, group = Strategy, fill=Strategy, color=Strategy)) + 
+  scale_color_manual(values = color_strategy) +
+  geom_point(size=2, alpha=0.6) + geom_line(size=1, alpha=0.6, linetype="dashed") +
+  # geom_text(aes(label=features), size=4, vjust=1, color = 'black') +
+  facet_wrap(Kingdom ~ ., scales = "free_y") + 
+  theme(axis.text.x=element_text(angle = -90, hjust = 0))
 
 # plot(table(t_asvs$SL+1))
 # plot(table(t_otus$SL))
-# Test resolution table ----
 
-r1 <- as.integer(t_otus$SL)+1
-r2 <- as.integer(t_asvs$SL)+1
+# Test resolution table ----
+length(r1 <- t_otus$SL)
+length(r2 <- t_asvs$SL)
+
+r1 <- as.integer(r1)+1
+r2 <- as.integer(r2)+1
 
 ntax_lev <- rbind(
   data.frame(ntaxa = data.frame(table(r1))[,2],
@@ -161,8 +322,13 @@ m2 <- data.frame(
   Strategy = 'ASV')
 
 # Estimate richness ----
-r_otus <- estimate_richness(c_otus)
-r_asvs <- estimate_richness(c_asvs) # include singletos bro!
+
+
+dim(r_otus <- c_otus)
+dim(r_asvs <- c_asvs)
+
+r_otus <- estimate_richness(r_otus)
+r_asvs <- estimate_richness(r_asvs) # include singletos bro!
 
 r_otus <- cbind(r_otus, m1)
 r_asvs <- cbind(r_asvs, m2)
@@ -213,8 +379,8 @@ jitter <- p + geom_jitter(
        y="Alfa diversity") +
   theme_classic()
 
-ggsave(jitter, path = out, filename = 'otus_vs_asvs_jitter_18S.png')
-ggsave(box, path = out, filename = 'otus_vs_asvs_box_18S.png')
+ggsave(jitter, path = out_path, filename = 'otus_vs_asvs_jitter_18S.png')
+ggsave(box, path = out_path, filename = 'otus_vs_asvs_box_18S.png')
 
 #
 
@@ -222,11 +388,13 @@ library(ggpubr)
 
 
 paired <- ggpaired(r, x = "Strategy", y = "Shannon",
-         color = "Crucero", line.color = "gray", line.size = 0.4,
-         palette = "jco", facet.by = "Crucero")+
-  stat_compare_means(paired = TRUE)
+         color = "Strategy", line.color = "gray", line.size = 0.4,
+         palette = color_strategy, facet.by = "Crucero")+
+  stat_compare_means(paired = TRUE)  +
+  theme_bw() + labs(y = 'Diversity', x = '') +
+  theme(legend.position = "bottom")
 
-ggsave(paired, path = out, filename = 'otus_vs_asvs_paired_18S.png')
+ggsave(paired, path = out_path, filename = 'otus_vs_asvs_paired_18S.png')
 
 # Test tax using the plot of coverage ----
 
@@ -243,6 +411,20 @@ p1 <- phyloseq(otu_table(c_otus, taxa_are_rows = TRUE),
 p2<- phyloseq(otu_table(c_asvs, taxa_are_rows = TRUE), 
                tax_table(as(t_asvs, 'matrix')), 
                sample_data(m2))
+
+# filter only animalia: ----
+
+
+# 
+# table(t_otus$Kingdom)
+# table(t_asvs$Kingdom)
+
+
+# king1 <- tax_glom(p1)
+# king2 <- tax_glom(p2)
+
+p1 <- subset_taxa(p1, Kingdom == 'Animalia')
+p2 <- subset_taxa(p2, Kingdom == 'Animalia')
 
 # For otus (1)
 
@@ -283,7 +465,7 @@ scatter <- ggplot(n, aes(x = Rank, y = ngroup, shape = Crucero, color = pct_r,
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
   facet_wrap(~ Strategy, scales = 'free_y')
 
-ggsave(scatter, filename = "otus_vs_asvs_sequence_cov.png", dpi = 200, path = out_path)
+ ggsave(scatter, filename = "otus_vs_asvs_sequence_cov.png", dpi = 200, path = out_path)
 
 # singletones ----
 k1 <- data.table(phy_summary(p1), Strategy = 'OTU')
@@ -302,6 +484,7 @@ physeq_summary$Filter <- factor(physeq_summary$Filter, levels = c('Keep', 'Clean
 
 # group sequence sizes by ktone
 physeq_summary[, seq_group := ifelse((taxSum >= 1 & taxSum <= 10), "A", "B")]
+
 # physeq_summary[(taxSum >= 1 & taxSum <= 10), seq_group := "A"]
 # physeq_summary[(taxSum >= 11 & taxSum <= 99), seq_group := "B"]
 # physeq_summary[(taxSum >= 100 & taxSum <= 999), seq_group := "C"]
@@ -320,17 +503,111 @@ logplot <- ggplot(physeq_summary, aes(x = nsamp, y = logSum,
   guides(color = FALSE, shape = FALSE) +
   theme_classic() +
   theme(legend.position = "top") + 
-  facet_grid(Filter ~., scales = 'free_y', space="free") + 
+  facet_Intersect(Filter ~., scales = 'free_y', space="free") + 
   theme(strip.background = element_blank(), strip.text = element_blank()) +
   labs(color = '', x = 'Frequency in samples', y = 'log(Number of sequences)')
        
 
 ggsave(logplot, filename = "otus_vs_asvs_kdist.png", dpi = 200 ,path = out_path)
 
-# path all
+
+# Intersection groups ----
+
+table_tax <- function(tax_tbl, rank, wrap) {
+  
+  
+  l_tax <- subset(tax_tbl, select = rank)
+  pct <- (table(l_tax) / sum(table(l_tax))) * 100
+  
+  out <- data.table(table(l_tax),
+                    pct = as.vector(pct),
+                    wrap = wrap)
+  names(out)[1] <- rank
+  
+  return(out)
+}
+
+l <- "Family"
+
+mdf <- rbind(table_tax(t_otus, l, 'OTU'),
+             table_tax(t_asvs, l, 'ASV'))
+
+
+undetermined <- filter(mdf, Family == 'Undetermined_R')
+
+mdf <- data.table(filter(mdf, Family != 'Undetermined_R'))
+# Check intersection
+
+mdf$Intersect <- mdf$wrap
+
+mdf[mdf$Family %in% names(which(table(mdf$Family) > 1)), Intersect := 'Both']
+
+# Prepare table for path
+n <- function(x) {length(unique(x))}
+
+intersect <- data.table(aggregate(mdf$Family,
+                            by = list(mdf$Intersect),
+                            FUN = n))
+
+names(intersect) <- c('Intersect', l)
+
+intersect <- rbind(intersect, 
+             data.table(Intersect = 'Total', 
+                        Family = sum(tbl$Family)))
+
+# Change name to remainder of rank less than 1% before plot
+size <- 0.2
+
+mdf[(Intersect != 'Both' & pct <= size), Family := "Others"]
+mdf[(pct <= size & Intersect == 'Both'), Family := "Others"]
+
+
+# p = filter(mdf, Family != 'Undetermined_R') %>%
+#   ggplot(aes(x = reorder(Family, pct), y = pct, fill = wrap)) +
+#   scale_fill_manual(values = color_strategy) + 
+#   coord_flip()
+# p = p + geom_bar(stat="identity", position = position_stack(), alpha = 0.8, color = 'black', size = 0.2)
+# p = p + theme(axis.text.x = element_text(angle = 0, hjust = 0))
+# 
+# bar <- p + facet_Intersect(Intersect ~., scales = 'free', space="free") + 
+#   theme_classic() +
+#   labs(x = l, y = 'Percent of features', 
+#        caption = paste0("< ", size, "% of Percent features is grouped in Others\nThe Bars are stacked")) +
+#   guides(fill=guide_legend(ncol=2)) +
+#   theme(legend.position = "top", axis.text.y=element_text(size=5))
+
+# Agglomerate and count taxa to level l
+
+tax_db <- rbind(t_asvs, t_otus) %>%
+  select(-SL) %>%
+  distinct() %>%
+  as_tibble()
+
+
+mdf %>%
+  inner_join(tax_db, by = "Family") %>%
+  distinct() %>%
+  filter(Family != 'Undetermined_R') %>%
+  ggplot(aes(x = Intersect, y = Family, color = Class)) +
+  geom_point(aes(size = )) + 
+  facet_Intersect(~wrap, space = "free", scales = "free") +
+  #scale_color_manual(values = color_strategy) +
+  scale_color_brewer(palette = 'Paired') +
+  theme_classic() + guides(fill=guide_legend(ncol=1)) +
+  theme(
+    axis.title.x=element_blank(),
+    axis.text.x=element_text(angle = 90, hjust = 1))
+
+# path all ----
 
 library(patchwork)
-levplot
-save <- (logplot + box ) / (levplot) + scatter
+tbl <- gridExtra::tableGrob(t(draw_kingdom_tbl))
+tbl2 <- gridExtra::tableGrob(intersect)
+
+p1 <- paired +  tbl + tbl2 + plot_layout(widths = c(3.5, 1, 1))
+p2 <- (logplot + scatter) + plot_layout(widths = c(1, 2))
+save <- p1 / p2
+
 ggsave(save, filename = "otus_vs_asvs_summary.png", dpi = 200 ,path = out_path,
-       width = 10, height = 10)
+       width = 12, height = 10)
+
