@@ -33,11 +33,14 @@ source(url)
 
 draw_res <- function(tax_table, count_table, rank = names(tax_table)[1]) {
   
+  count_table <- data.frame(count_table)
+  tax_table <- data.frame(tax_table)
+  
   abundance <- rowSums(count_table)
   tax_rank <- tax_table[, rank]
   
   res <- names(tax_table)[ncol(tax_table)] # Last column shoud be SL
-  resolution <- tax_table[, res]
+  resolution <- as.integer(tax_table[, res])
   
   out <- data.frame(Abundance = abundance, Rank = tax_rank, 
                     Resolution = resolution, stringsAsFactors = FALSE)
@@ -81,6 +84,9 @@ draw_res <- function(tax_table, count_table, rank = names(tax_table)[1]) {
 
 
 draw_rank <- function(tax_table, count_table, rank = names(tax_table)[1]) {
+  
+  count_table <- data.frame(count_table)
+  tax_table <- data.frame(tax_table)
   
   abundance <- rowSums(count_table)
   tax_rank <- tax_table[, rank]
