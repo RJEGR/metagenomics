@@ -133,7 +133,7 @@ reads_n_features <- function(physeq, ktone = 1, ...) {
   psample <- prune_taxa(taxa_sums(psample) > ktone, psample)
   
   out <- psmelt(psample)
-  out <- filter(out, Abundance > 0) %>% select(OTU, Abundance, Crucero, Ranks)
+  out <- filter(out, Abundance > 0) %>% select(OTU, Abundance, Crucero, all_of(Ranks))
   out <- reshape2::melt(out, 
                        measure.vars = Ranks, 
                        variable.name = 'Rank', value.name='name')
