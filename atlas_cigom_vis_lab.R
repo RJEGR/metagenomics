@@ -11,7 +11,8 @@ cleanTax <- c('Arachnida', 'Mammalia', 'Insecta', 'Undetermined_R')
 
 Level <- 'Family'
 # agglomerate families
-tbl_agglom <- function(tax_tbl, count_tbl, Level = names(tax_tbl)[4]) {
+tbl_agglom <- function(tax_tbl, count_tbl, Level = names(tax_tbl)[4], 
+                       fkingdom = 'Animals') {
   
   scheck <- identical(rownames(tax_tbl), rownames(count_tbl))
   
@@ -23,43 +24,45 @@ tbl_agglom <- function(tax_tbl, count_tbl, Level = names(tax_tbl)[4]) {
   tbl <- cbind(tax_tbl, count_tbl)
   sam <- colnames(count_tbl)
   
+  cleanClass <- c('Insecta', 'Mammalia', 'Arachnida')
+  
   tbl_agglom <- tbl %>%
-    select(Level, sam) %>%
-    drop_na(Level) %>% # to clean the redundant names (NA assignation)
+    filter(Kingdom == fkingdom) %>%
+    filter(!Class %in%  cleanClass) %>%
+    #select(Level, sam) %>%
+    #drop_na(Level) %>% # to clean the redundant names (NA assignation)
     group_by_at(vars(one_of(Level))) %>%
     summarise_at(vars(sam), sum) %>%
-    ungroup()
+    ungroup() %>%
+    filter(Family != 'Undetermined_R')
+    
   
   return(tbl_agglom)
 }
 
  
-v9_fam <- tbl_agglom(tax1, ab1, Level = Level)
-coi_fam <- tbl_agglom(tax2, ab2, Level = Level)
+v9_fam <- tbl_agglom(tax1, ab1, Level = Level, fkingdom = 'Animalia')
+# coi_fam <- tbl_agglom(tax2, ab2, Level = Level, fkingdom = 'Animals')
 
+total <- sum(rowSums(v9_fam[-1]))
+tax_sum <- round((rowSums(v9_fam[-1]) / total) * 100, 4)
 
-v9_fam <- v9_fam[v9_fam$Family != 'Undetermined_R',]
-
-total <- sum(rowSums(dat))
-tax_sum <- round((rowSums(dat) / total) * 100, 4)
-
-coi_fam %>%
-  select(-Level) %>%
-  mutate(total = sum(rowSums(.))) %>% 
-  mutate(pct = round((rowSums(.) / total) * 100, 4)) %>%
-  select(pct)
+# coi_fam %>%
+#   select(-Level) %>%
+#   mutate(total = sum(rowSums(.))) %>% 
+#   mutate(pct = round((rowSums(.) / total) * 100, 4)) %>%
+#   select(pct)
 
 # transform-data-count, how?
 library(ggforce)
-sam <- colnames(coi_fam)[-1]
-coi_fam %>% 
-  filter(!all_of(Level) %in% cleanTax) %>%
+sam <- colnames(v9_fam)[-1]
+v9_fam %>% 
   # mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
   pivot_longer(cols = !all_of(Level), names_to = 'id_sample', 
                values_to = 'ab') %>%
   filter(ab > 1) %>% # Not!!
-  mutate(cruise = sapply(strsplit(id_sample, "[.]"), `[`, 1),
-         sample = sapply(strsplit(id_sample, "[.]"), `[`, 2),
+  mutate(cruise = sapply(strsplit(id_sample, "[_]"), `[`, 2),
+         sample = sapply(strsplit(id_sample, "[_]"), `[`, 3),
          Family = reorder(Family, ab)) -> dv 
 dv %>%
   ggplot(aes(x = as.numeric(Family), y = ab, fill = cruise)) +
@@ -74,49 +77,10 @@ dv %>%
   breaks = 1:length(levels(dv$Family)),
   label = levels(dv$Family))
 
-# 18S
-# c <- 
-# s <- sapply(strsplit(sam, "[_]"), `[`, 3)
-# v9_fam
-v9_fam %>% 
-  filter(!all_of(Level) %in% cleanTax) %>%
-  # mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
-  pivot_longer(cols = !all_of(Level), names_to = 'id_sample', 
-               values_to = 'ab') %>%
-  #filter(ab > 1) %>% # Not!!
-  mutate(cruise = sapply(strsplit(id_sample, "[_]"), `[`, 2),
-         sample = sapply(strsplit(id_sample, "[_]"), `[`, 3),
-         Family = reorder(Family, ab)) -> dv1
 
-coi_fam %>% 
-  filter(!all_of(Level) %in% cleanTax) %>%
-  # mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
-  pivot_longer(cols = !all_of(Level), names_to = 'id_sample', 
-               values_to = 'ab') %>%
-  #filter(ab > 1) %>% # Not!!
-  mutate(cruise = sapply(strsplit(id_sample, "[.]"), `[`, 1),
-         sample = sapply(strsplit(id_sample, "[.]"), `[`, 2),
-         Family = reorder(Family, ab)) -> dv2
 
-dv2 %>%
-  ggplot(aes(x = as.numeric(Family), y = ab, fill = cruise)) +
-  geom_bar(stat="identity",
-           position = position_dodge(), width = 0.7,
-           alpha = 0.8, color = 'black', size = 0.2) + 
-  #facet_grid(cruise~.) +
-  scale_fill_manual(values=color_Crucero) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7)) +
-  facet_zoom(x = ab > 10000) +
-  scale_x_continuous(
-    breaks = 1:length(levels(dv$Family)),
-    label = levels(dv$Family))
-# top
-
-v9_fam %>% mutate_at(vars(!all_of(Level)),
-                      function(x) {x / sum(x) * 100 }) # -> v9_fam
-
-# select(top)
-dv2 %>%
+# frequency
+dv %>%
   filter(ab > 0) %>%
   group_by(Family, sample) %>%
   summarise(mean = mean(ab), Total = sum(ab), 
@@ -161,10 +125,6 @@ c <- sapply(strsplit(sam, "[_]"), `[`, 2)
 s <- sapply(strsplit(sam, "[_]"), `[`, 3)
 t <- substr(s, 1,1)
 
-# For COI
-# c <- sapply(strsplit(sam, "[.]"), `[`, 1)
-# s <- sapply(strsplit(sam, "[.]"), `[`, 2)
-# t <- substr(s, 1,1)
 
 rownames(ftable) <- paste(s,c, sep = "_")
 
@@ -210,29 +170,34 @@ labels(dend) <- s # paste(samples, cruise, sep = '_')
 #
 
 
-pick_top <- function(x,pos, top = 10) {
-  Level <- 'Family'
+pick_top <- function(x, y, top = 10) {
+
+  # x <- vector of abundance
+  # y <- vector of taxonomic name
   
-  x <- data.frame(x)
-  ordered <- order(x[,pos], decreasing = T)
+  ordered <- order(x, decreasing = T)
   topPos <- head(ordered, top)
-  taxPos <- taxname[topPos]
+  taxPos <- y[topPos]
   
   return(taxPos)
 }
 
+v9_fam <- tbl_agglom(tax1, ab1, Level = Level, fkingdom = 'Animalia')
+
+v9_fam %>%
+  as_tibble() %>%
+  select_at(vars(-contains('X017_X07'))) -> v9_fam
+
 sam <- names(v9_fam)[-1]
 
-apply(v9_fam, 2, pick_top, top = 10) %>%
+
+
+apply(v9_fam[-1], 2, pick_top, top = 10, y = v9_fam$Family) %>%
   as_tibble() %>%
-  select(-Level) %>%
   pivot_longer(all_of(sam), names_to = 'id_sample', 
                values_to = Level) %>%
-  filter_at(vars(id_sample), all_vars(!grepl('X017_X07',.))) %>%
-  #group_by(Level) %>%
   distinct_at(all_of(Level)) %>%
-  inner_join(v9_fam) %>%
-  select_at(vars(-contains("X017_X07"))) -> fam_top
+  inner_join(v9_fam) -> fam_top
 
 # tags
 sam <- names(fam_top)[-1]
@@ -251,24 +216,65 @@ rownames(m) <- fam_top$Family
 
 # heatm
 
-set.seed(20200511)
 
-superheat(m,
+total <- sum(rowSums(fam_top[-1]))
+tax_sum <- round((rowSums(fam_top[-1]) / total) * 100, 4)
+
+
+set.seed(20200511)
+path1 <- '/Users/cigom/metagenomics/MG_18S/multirun_xiximis/downstream_X4X5X6X7/'
+
+png(paste0(path1,"superheat.png"), 
+    height = 11, width = 17, res = 300,
+    units = 'in')
+
+apply(m, 2, function(x) x/sum(x) * 100) %>%
+  superheat(
           scale = F,
           row.dendrogram = T,
           clustering.method = 'hierarchical',
           dist.method = 'euclidean',
           membership.cols = c,
-          left.label.text.size = 2.0,
+          left.label.text.size = 4.0,
           left.label.col = 'white',
           # bottom.label.text.size = 2.0,
           # bottom.label.text.angle = 75,
-          grid.hline = F,
-          grid.vline = T)
+          grid.hline = T,
+          grid.vline = T,
+          yt = colSums(fam_top[-1]),
+          yt.plot.type = "bar",
+          yt.axis.name = "Total Reads",
+          legend.width = 4,
+          legend.text.size = 12,
+          legend.breaks = c(0,20,40,60,80))
 
+dev.off()
+
+# select samples
+mset1 <- m[,grep('X04', colnames(m))]
+
+# ordenar taxones con respecto a X04 
+# superheat(mset1,
+#           scale = F,
+#           row.dendrogram = T,
+#           col.dendrogram = T,
+#           clustering.method = 'hierarchical',
+#           dist.method = 'euclidean', 
+#           print.plot = F) -> sh
+
+# u ordenar con respecto a todo los datos 
+superheat(apply(m, 2, function(x) x/sum(x) * 100),
+          scale = F,
+          row.dendrogram = T,
+          col.dendrogram = T,
+          clustering.method = 'hierarchical',
+          dist.method = 'euclidean',
+          print.plot = F) -> sh
 
 # dist <- dist(t(m), method = "euclidean")
-# sampleOrder <- 
+tax_hclust <- sh$order.rows
+tax_hclust <- rownames(m)[tax_hclust]
+#tax_hclust <- rev(tax_hclust)
 # sampleOrder <- colnames(otu_table(phyFamilies))[sampleOrder]
 
 # m %>%
@@ -277,8 +283,7 @@ superheat(m,
 #   as.phylo.dendrogram() %>%
 #   plot(type = "phylogram", tip.color = cc, cex = 0.7)
   
-# select samples
-mset <- m[,grep('X06', colnames(m))]
+
 
 reorder_cormat <- function(matrix){
   # Use correlation between variables as distance
@@ -288,56 +293,106 @@ reorder_cormat <- function(matrix){
   return(matrix_r)
 }
 
-round(cor(mset), 2) %>%
-  reorder_cormat() %>% rownames() -> sample_hclust
 
-round(cor(t(mset)), 2) %>%
-  reorder_cormat() %>% rownames() -> tax_hclust
+# tl.col.hclust <- color_Crucero[match(cruise_hclust, names(color_Crucero))]
+# names(tl.col.hclust) <- sample_hclust
 
-cruise_hclust <- sapply(strsplit(sample_hclust, "[_]"), `[`, 1)
+cleanClass <- c('Insecta', 'Mammalia', 'Arachnida')
 
-tl.col.hclust <- color_Crucero[match(cruise_hclust, names(color_Crucero))]
-names(tl.col.hclust) <- sample_hclust
-
-# heatmap(as.matrix(dist(t(m))))$colInd
-# heatmap(as.matrix(dist(m)))$colInd
 tax1 %>%
-  select(Ranks) %>%
   as_tibble() %>%
+  select(Ranks) %>%
+  filter(Kingdom == 'Animalia') %>%
+  filter(!Class %in%  cleanClass) %>%
+  filter(Family != 'Undetermined_R') %>%
+  group_by(Family) %>%
   distinct_at(all_of(Level), .keep_all = T) %>%
   select(Phylum,Class,Order,Family) -> tax
+
+plotHeat <- function(mset, facet = TRUE, col_hclust = FALSE) {
   
-m %>% 
-  as_tibble(rownames = 'Family') %>%
-  mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
-  pivot_longer(cols = all_of(sample_hclust)) %>%
-  mutate(Estacion = sapply(strsplit(name, "[_]"), `[`, 2),
-         Crucero = sapply(strsplit(name, "[_]"), `[`, 1)) %>%
-  mutate(name = factor(name , levels = sample_hclust),
-         Family = factor(Family, levels = tax_hclust),
-         value = ifelse(value == 0, NA, value)) %>%
-  inner_join(tax) %>%
-  ggplot(aes(x = Estacion, y = reorder(Family, value), fill = value, color = Crucero))+
-  geom_tile(color = "grey")+
-  ggsci::scale_fill_material("indigo",  name="Relative\nAbundance") +
-  labs(x = "", y = "") +
-  theme_classic() + 
-  theme(axis.text.x = element_text(angle = 45, vjust = 1,
-                                   size = 12, hjust = 1),
-        axis.text.y = element_text(face = 'bold.italic')) +
-  guides(fill = guide_colorbar(barheight = unit(7, "cm"),  
-                               ticks.colour = "black", frame.colour = "black")) +
-    facet_grid(Phylum+Class ~ ., 
-               scales = "free", space = "free" ) + 
+  if(col_hclust) {
+    round(cor(mset), 2) %>% reorder_cormat() %>% rownames() -> sample_hclust
+    sample_hclust <- sapply(strsplit(sample_hclust, "[_]"), `[`, 2)
+  } else {
+    sample_hclust <- colnames(mset)
+    sample_hclust <- sapply(strsplit(sample_hclust, "[_]"), `[`, 2)
+  }
+
+
+ p <-  mset %>% 
+    as_tibble(rownames = 'Family') %>%
+    mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
+    pivot_longer(cols = !all_of(Level), values_to = "ra", 
+                 names_to = "station") %>%
+    inner_join(tax) %>%
+    mutate(Estacion = sapply(strsplit(station, "[_]"), `[`, 2),
+           Crucero = sapply(strsplit(station, "[_]"), `[`, 1)) %>%
+    mutate(Estacion = factor(Estacion , levels = sample_hclust),
+           Family = factor(Family, levels = tax_hclust),
+           ra = ifelse(ra == 0, NA, ra)) %>%
+    ggplot(aes(x = Estacion, y = Family, fill = ra, color = Crucero))+
+    geom_tile(color = "black") +
+    ggsci::scale_fill_material("indigo",  
+                               name="Abundancia\nRelativa", na.value = 'white',
+                               labels = scales::percent_format(scale = 1)) +
+    labs(x = NULL, y = NULL) +
+    theme_classic() + 
+    theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                     size = 12, hjust = 1),
+          axis.text.y = element_text(face = 'bold.italic', size = 12)) +
+    guides(fill = guide_colorbar(barheight = unit(9, "in"),
+                                 ticks.colour = "black", 
+                                 frame.colour = "black",
+                                 label.theme = element_text(size = 16))
+    ) +
     theme(
       axis.text.x = element_text(
         angle = 45, hjust = 1, vjust = 1),
       strip.text.y = element_text(
         angle = 0, 
-        size = 5),
+        size = 12),
       strip.background = element_rect(colour = "black", 
                                       fill = "transparent",
-                                      size = 0.1),
-      panel.spacing = unit(0.001, "lines")
-    )
+                                      size = 0.4),
+      panel.spacing = unit(0.007, "lines"))
+  
+  if(facet) {
+    p + facet_grid(Phylum + Class ~ ., 
+               scales = "free", space = "free" )
+  } else
+    return(p)
 
+}
+
+p1 <- plotHeat(mset1)
+
+# 2
+mset2 <- m[,grep('X05', colnames(m))]
+p2<- plotHeat(mset2)
+
+# 3
+
+mset3 <- m[,grep('X06', colnames(m))]
+p3<- plotHeat(mset3)
+
+ggsave(p1, filename = 'heatmap_X4.png', dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+ggsave(p2, filename = 'heatmap_X5.png', dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+ggsave(p3, filename = 'heatmap_X6.png', dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+
+p1nf <- plotHeat(mset1, facet = F, col_hclust = F) + 
+  viridis::scale_fill_viridis()
+p2nf <- plotHeat(mset2, facet = F, col_hclust = F) + 
+  viridis::scale_fill_viridis()
+p3nf <- plotHeat(mset3, facet = F, col_hclust = F) + 
+  viridis::scale_fill_viridis()
+
+ggsave(p1nf, filename = 'heatmapnf_X4.png', dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+ggsave(p2nf, filename = 'heatmapnf_X5.png', dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+ggsave(p3nf, filename = 'heatmapnf_X6.png', dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
