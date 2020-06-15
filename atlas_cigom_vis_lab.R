@@ -10,6 +10,7 @@ color_Crucero <- c('X04'='#00AFBB','X05'= '#E7B800', 'X06'='#FC4E07', 'X07'='red
 cleanTax <- c('Arachnida', 'Mammalia', 'Insecta', 'Undetermined_R')
 
 Level <- 'Family'
+
 # agglomerate families
 tbl_agglom <- function(tax_tbl, count_tbl, Level = names(tax_tbl)[4], 
                        fkingdom = 'Animals') {
@@ -55,6 +56,7 @@ tax_sum <- round((rowSums(v9_fam[-1]) / total) * 100, 4)
 
 # transform-data-count, how?
 library(ggforce)
+
 sam <- colnames(v9_fam)[-1]
 v9_fam %>% 
   # mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
@@ -390,9 +392,83 @@ p2nf <- plotHeat(mset2, facet = F, col_hclust = F) +
 p3nf <- plotHeat(mset3, facet = F, col_hclust = F) + 
   viridis::scale_fill_viridis()
 
+
+
 ggsave(p1nf, filename = 'heatmapnf_X4.png', dpi = 300, path = path1,
        units = 'in', width = 17, height = 11)
 ggsave(p2nf, filename = 'heatmapnf_X5.png', dpi = 300, path = path1,
        units = 'in', width = 17, height = 11)
 ggsave(p3nf, filename = 'heatmapnf_X6.png', dpi = 300, path = path1,
        units = 'in', width = 17, height = 11)
+
+library(UpSetR)
+m %>% 
+  as_tibble(rownames = 'Family') %>%
+  mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
+  mutate_at(vars(!all_of(Level)), function(x) {ifelse(x > 0, 1, 0) }) %>%
+  select(-Family) %>% data.frame(row.names = rownames(m)) %>% #t() %>%
+  data.frame() -> binary_m
+
+# Error: vector memory exhausted (limit reached?)
+upset(binary_m,
+  nsets =  12, #nrow(m),
+  #nintersects = NA,
+  # Display them from the most numerous intersection to the least
+  order.by = "freq",
+  line.size = 0.7,
+  point.size = 1.7,
+  text.scale = 1.3,
+  mb.ratio = c(0.30, 0.70),
+  empty.intersections = "off")
+
+m %>% 
+  as_tibble(rownames = 'Family') %>%
+  mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
+  mutate_at(vars(!all_of(Level)), function(x) {ifelse(x > 0, 1, 0) }) %>%
+  pivot_longer(cols = !all_of(Level), values_to = "pa", names_to = "id") %>%
+  mutate(station = sapply(strsplit(id, "[_]"), `[`, 2),
+         cruise = sapply(strsplit(id, "[_]"), `[`, 1)) %>%
+  filter(pa > 0) %>%
+  group_by(Family, cruise) %>%
+  summarise(Freq = sum(pa)) %>%
+  ungroup() %>%
+  mutate(frac = ifelse(cruise == 'X04', Freq/47,
+                       ifelse(cruise == 'X05', Freq/33,
+                       ifelse(cruise == 'X06', Freq/42, Freq)))) %>%
+  mutate(frac = round(frac, digits = 3)*100 ) %>%
+  mutate(Family = factor(Family, levels = tax_hclust)) -> FreqSamples
+
+freqplot <- FreqSamples %>%
+  ggplot() +
+  geom_tile(aes(x = cruise, y = Family, fill = frac),
+    colour = "black",
+    size = .3, show.legend = F) +
+  geom_text(aes(y = Family, x = cruise, label=as.factor(Freq)), size = 7) +
+  ggsci::scale_fill_material("indigo",  
+                           name="Presencia\nmuestras", na.value = 'grey',
+                           labels = scales::percent_format(scale = 1)) +
+  labs(x = NULL, y = NULL) +
+  theme_bw() + 
+  theme(text = element_text(size = 12),
+        axis.line.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid = element_line(size = .2),
+        panel.border = element_blank(),
+        axis.text.y = element_text(face = 'bold.italic'))
+  # guides(fill = guide_colorbar(barheight = unit(9, "in"),
+  #                              ticks.colour = "black", 
+  #                              frame.colour = "black",
+  #                              label.theme = element_text(size = 12)))
+
+heatmap <- plotHeat(mset, facet = F, col_hclust = F) +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+
+library(patchwork)
+plot <- freqplot + heatmap + plot_layout(widths = c(1, 2))
+ggsave(plot, filename = 'patchwork.png', 
+       dpi = 300, path = path1,
+       units = 'in', width = 5, height = 10)
+filename = 'heatmap.png', dpi = 300, path = path1,
+units = 'in', width = 17, height = 11)
