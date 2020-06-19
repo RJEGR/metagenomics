@@ -442,7 +442,7 @@ freqplot <- FreqSamples %>%
   ggplot() +
   geom_tile(aes(x = cruise, y = Family, fill = frac),
     colour = "black",
-    size = .3, show.legend = F) +
+    size = .3, show.legend = T) +
   geom_text(aes(y = Family, x = cruise, label=as.factor(Freq)), size = 7) +
   ggsci::scale_fill_material("indigo",  
                            name="Presencia\nmuestras", na.value = 'grey',
@@ -455,20 +455,166 @@ freqplot <- FreqSamples %>%
         axis.ticks.x = element_blank(),
         panel.grid = element_line(size = .2),
         panel.border = element_blank(),
-        axis.text.y = element_text(face = 'bold.italic'))
-  # guides(fill = guide_colorbar(barheight = unit(9, "in"),
-  #                              ticks.colour = "black", 
-  #                              frame.colour = "black",
-  #                              label.theme = element_text(size = 12)))
+        axis.text.y = element_text(face = 'bold.italic'),
+        legend.position = "left") +
+  guides(fill = guide_colorbar(barheight = unit(9, "in"),
+                               ticks.colour = "black",
+                               frame.colour = "black",
+                               label.theme = element_text(size = 12)))
 
 heatmap <- plotHeat(mset, facet = F, col_hclust = F) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
 
 library(patchwork)
-plot <- freqplot + heatmap + plot_layout(widths = c(1, 2))
+
+plot <- freqplot + heatmap + plot_layout(widths = c(1, 3))
 ggsave(plot, filename = 'patchwork.png', 
        dpi = 300, path = path1,
-       units = 'in', width = 5, height = 10)
-filename = 'heatmap.png', dpi = 300, path = path1,
-units = 'in', width = 17, height = 11)
+       units = 'in', width = 17, height = 11)
+
+# parallele
+
+# library(devtools)
+# install_github("ramnathv/htmlwidgets")
+#install_github("McKayMDavis/klustR")
+# install.packages('klustR')
+
+library(tidyverse)
+library(patchwork)
+library(GGally)
+library(viridis)
+
+
+m %>% 
+  as_tibble(rownames = 'Family') %>%
+  mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
+  pivot_longer(cols = !all_of(Level), values_to = "ab", names_to = "id") %>%
+  mutate(station = sapply(strsplit(id, "[_]"), `[`, 2),
+         cruise = sapply(strsplit(id, "[_]"), `[`, 1)) %>%
+  pivot_wider(names_from = Family, values_from = ab) %>%
+  mutate(cruise = factor(cruise), station = factor(station)) %>%
+  ggparcoord(
+    columns = 4:45, # 
+    groupColumn = 3, 
+    order = "anyClass",
+    showPoints = TRUE, 
+    boxplot = TRUE,
+    title = "Parallel Coordinate Plot - no scaling",
+    alphaLines = 0.3,
+    scale = 'std'
+    
+  ) + 
+  scale_color_manual(values = color_Crucero) +
+ theme_bw()+
+  theme(
+    plot.title = element_text(size=10),
+    axis.text.x = element_text(angle = 45, vjust = 1,
+                                     size = 10, hjust = 1,
+                               face = 'bold.italic')) + facet_grid(cruise~.)
+
+# diversity ----
+taxrank <- 'Family'
+top <- 50 # 50
+family <- tax_glom(physeq1, taxrank = taxrank, NArm = FALSE)
+
+physeq %>%
+  tax_glom(taxrank = 'Family', NArm = FALSE) %>%
+  subset_taxa(Family %in%  rownames(m)) %>%
+  prune_taxa(taxa_sums(.) > 0,.) -> famphy
+
+obs_vs_chao <- estimate_richness(famphy) %>%
+  as_tibble(rownames = 'id') %>%
+  filter_at(vars(id), all_vars(!grepl('X017_X07',.))) %>%
+  mutate(ship = sapply(strsplit(id, "[_]"), `[`, 2),
+         cruise = sapply(strsplit(id, "[_]"), `[`, 3))
+library(ggpubr)
+
+divplot <- obs_vs_chao %>%
+  ggscatter(
+    x = "Chao1", y = "Observed",
+    color = "Shannon",
+    label = "cruise",
+    repel = T, label.rectangle = T,
+    xlab = "Predecido (estimador Chao1)",
+    ylab = "Observado",
+    facet.by = 'ship',
+    conf.int = TRUE,
+    cor.coef = T) +
+  gradient_color(ggsci::pal_gsea("default")(10))
+
+ggsave(divplot, filename = 'diversity.png', 
+       dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+
+write.table(obs_vs_chao, file = paste0(path1, "/estimated_richness.csv"))
+
+comp <- list(c('X04','X05'), c('X04','X06'))
+boxp <- obs_vs_chao %>%
+  ggboxplot(x = "ship", y = "Shannon",
+                   color = "ship",
+            add = "jitter", notch = TRUE,
+           #line.color = "gray", line.size = 0.4,
+                   palette = color_Crucero) +
+  stat_compare_means(comparisons = comp) +
+  stat_compare_means(label.y = 3.5)  +
+  #stat_compare_means(method = "anova", label.y = 3.5) +
+  stat_compare_means(label = "p.signif", method = "t.test",
+                     ref.group = "X04") +
+  theme_bw() + labs(y = 'Shannon', x = '') +
+  theme(legend.position = "none") 
+
+
+ggsave(boxp, path = path1, filename = 'boxdiversity.png')
+
+# maps ----
+path_v9 <- "/Users/cigom/metagenomics/Franccesco/multirun_xixim_18S/"
+abiotic <- read.csv(paste0(path_v9, 'abiotic.csv'), stringsAsFactors = FALSE)
+
+names <- c('SampleID','Temp', 'Salinity', 'Oxygen', 'Fluorescence', 'Density')
+
+abiotic <- abiotic[names(abiotic) %in% names]
+
+obs_vs_chao %>% 
+  mutate(SampleID = paste(cruise, ship, sep = '.')) %>%
+  inner_join(abiotic, by = 'SampleID') %>%
+  select(cruise, ship, Shannon, Long, Latitude) %>%
+  mutate(Long = -Long)-> datmap
+
+# library("rnaturalearthdata")
+# library('rnaturalearth')
+# library('ggspatial')
+# library('sf')
+# library(ggalt)
+
+gg <- ggplot2::map_data("world", region = "Mexico") %>%
+  ggplot() + 
+  geom_polygon(aes(x=long, y = lat, group = group), fill = NA, color = "black", size = 0.7) + 
+  coord_fixed(xlim = c(-99,-84), 
+              ylim = c(18,26)) 
+ # coord_fixed(xlim = c(-99,-84), ylim = c(18,26)) 
+# 
+library(ggrepel)
+save_map <- gg + 
+  geom_point(data = datmap, 
+         aes(Long, Latitude, 
+             color = Shannon),
+         alpha = 0.7, shape = 20, size =7) +
+  # alpha = 0.7, shape = 15, size =7)
+  # geom_label_repel(data = datmap,
+  #                  aes(Long, Latitude,
+  #                      color = Shannon,
+  #                      label = cruise),
+  #            alpha = 0.7,
+  #            fill = 'white',
+  #            size = 2.7) +
+  gradient_color(ggsci::pal_gsea("default")(10)) +
+  theme_bw() + 
+  theme(legend.position = "top") +
+  guides(color = guide_colorbar(barheight = unit(0.4, "in"),barwidth = unit(10, "in"),ticks.colour = "black", frame.colour = "black",label.theme = element_text(size = 12))) +
+  facet_grid(~ship)
+
+ggsave(save_map, filename = 'map_points.png',  
+       dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+
