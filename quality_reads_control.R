@@ -144,20 +144,197 @@ rqcCycleBaseCallsPlot(qa)
 
 
 # Qual_vs_MaxEE_plot
-data_path <- '/Users/cigom/metagenomics/COI/run012/quality/no_group/'
+data_path <- '/Users/cigom/metagenomics/Franccesco/callahan_multirun/fastqc_clipped/'
+#data_path <- '/Users/cigom/metagenomics/COI/run012/quality/no_group/'
 fileqc <- list.files(data_path, pattern = '*zip', full.names = TRUE)
-fastq.r1 <- fileqc[1]
-fastq.r2 <- fileqc[2]
-source('https://raw.githubusercontent.com/RJEGR/infovis/master/qualMaxEEplot.R')
-qualMaxEEplot(fastq.r1 = fastq.r1, fastq.r2 = fastq.r2)
 
+# fastq.r1 <- fileqc[1]
+# fastq.r2 <- fileqc[1]
+#source('https://raw.githubusercontent.com/RJEGR/infovis/master/qualMaxEEplot.R')
+
+#qualMaxEEplot(fastq.r1 = fastq.r1, fastq.r2 = fastq.r2)
+
+run <- sapply(strsplit(basename(fileqc), "[-]"), `[`, 1)
+
+fastqr <- vector("list", length(unique(run)))
+names(fastqr) <- unique(run)
+
+
+set.seed(202007)
+for(runs in unique(run)) {
+  which_samples <- which(run %in% runs)
+  fastqr[[runs]] <- fileqc[sample(which_samples, 10)]
+}
+
+
+#fastqr <- fileqc[sample(which_samples,1)]
+tag <- function(filename) {sapply(strsplit(basename(filename), "[_]"), `[`, 1)}
+basenameF <- unlist(lapply(fastqr, tag))
+files <- fileqc[which(unlist(lapply(fileqc, tag)) %in% basenameF)]
+
+# check datavis ----
+raw_path <- '/Users/cigom/metagenomics/Franccesco/callahan_multirun/raw/'
+fq_raw <- list.files(raw_path, pattern = '*gz', full.names = TRUE)
+fq_raw <- fq_raw[tag(fq_raw) %in%  tag(files)]
+group <- sapply(strsplit(basename(fq_raw), "[-]"), `[`, 1)
+pn <- length(fq_raw) /2
+pair <- rep(1:pn, each = 2)
+qa <- rqcQA(fq_raw, pair = pair, workers = 1, group = group)
+
+ggsave(rqcReadQualityBoxPlot(qa), path = raw_path, 
+       filename = 'ReadQualityBoxPlo.png', width = 11)
+
+ReadQualityPlot <- rqcReadQualityCalc(qa) %>%
+  mutate(group = sapply(strsplit(as.character(filename), "[-]"), `[`, 1)) %>%
+  ggplot(aes_string(y = "quantile", x = "value", 
+                    colour = "group")) + 
+  geom_point(alpha = 3/5, shape = 4) + 
+  geom_smooth(aes(group = group, fill = group), method = "auto", se = T) +
+  guides(fill = 'none') +
+  labs(y = "% of Reads Exceeding Quality (q)", 
+                     x = "Quality (q)", colour = "Run",
+       subtitle = 'per-sample Quality fitted to y ~ x  polynomial model')
+
+ggsave(ReadQualityPlot, path = raw_path, 
+                filename = 'ReadQualityPlot.png', width = 11)
+
+len <- max(as.integer(rqcCycleAverageQualityCalc(qa)$cycle))
+
+CycleAverageQuality <- rqcCycleAverageQualityCalc(qa) %>%
+  ggplot(aes_string(x = "cycle", y = "quality",colour = "group")) + 
+  geom_point(alpha = 1/5) + 
+  # geom_line(aes_string(group = "filename")) + 
+  stat_smooth(aes(group = group, fill = group), se = T) +
+  labs(x = "Cycle", y = "Average Quality", colour = "Run",
+       subtitle = 'per-sample Quality fitted to y ~ x  polynomial model') + 
+  scale_y_continuous(limits = c(34,40)) +
+  guides(fill = 'none') +
+  scale_x_discrete(breaks = seq(from = 1, to = len, by = len%/%20))
+
+ggsave(CycleAverageQuality, path = raw_path, 
+       filename = 'CycleAverageQuality.png', width = 11)
+
+
+df <- rqcCycleQualityCalc(qa)
+len <- max(as.integer(df$cycle))
+
+CycleQualityPlot <- df %>%
+  mutate(group = sapply(strsplit(as.character(filename), "[-]"), `[`, 1)) %>%
+  ggplot(aes_string(x = "cycle", y = "percentiles", fill = "value")) + 
+  geom_tile() + viridis::scale_fill_viridis() + 
+    facet_grid(group ~.) + 
+  labs(x = "Cycle", y = "%", fill = "Quality") + 
+    scale_x_discrete(breaks = seq(from = 1, to = len, by = len%/%10)) +
+  guides(fill = guide_colorbar(barheight = unit(4, "in"),
+                               ticks.colour = "black", 
+                               frame.colour = "black",
+                               label.theme = element_text(size = 12)))
+ggsave(CycleQualityPlot, path = raw_path, 
+       filename = 'CycleQualityPlot.png', width = 11)
+
+
+# continue ----
 # fastqc --nogroup yourFastqFile_R1.fastq yourFastqFile_R2.fastq
+fastqStats <- function(fileqc) {
+  fastq <- data.frame(qc_read(fileqc, modules = "Per base sequence quality", verbose = TRUE)$per_base_sequence_quality)
+  fastq.tmp <- rbind(data.frame(R=fastq$Base, 
+                                Q=fastq$Mean, S=c("Mean"), 
+                                E=10^(-fastq$Mean/10), 
+                                A=Reduce('+', 10^(-fastq$Mean/10), accumulate = TRUE)),
+                     data.frame(R=fastq$Base, 
+                                Q=fastq$Median, 
+                                S=c("Median"), 
+                                E=10^(-fastq$Median/10), 
+                                A=Reduce('+', 10^(-fastq$Median/10), accumulate = TRUE)),
+                     data.frame(R=fastq$Base, 
+                                Q=fastq$Lower.Quartile, 
+                                S=c("Lower.Quartile"), 
+                                E=10^(-fastq$Lower.Quartile/10), 
+                                A=Reduce('+', 10^(-fastq$Lower.Quartile/10), accumulate = TRUE)),
+                     data.frame(R=fastq$Base, 
+                                Q=fastq$Upper.Quartile, 
+                                S=c("Upper.Quartile"), 
+                                E=10^(-fastq$Upper.Quartile/10), 
+                                A=Reduce('+', 10^(-fastq$Upper.Quartile/10), accumulate = TRUE)),
+                     data.frame(R=fastq$Base, 
+                                Q=fastq$X10th.Percentile, 
+                                S=c("X10th.Percentile"), 
+                                E=10^(-fastq$X10th.Percentile/10), 
+                                A=Reduce('+', 10^(-fastq$X10th.Percentile/10), accumulate = TRUE)),
+                     data.frame(R=fastq$Base, 
+                                Q=fastq$X90th.Percentile, 
+                                S=c("X90th.Percentile"), 
+                                E=10^(-fastq$X90th.Percentile/10), 
+                                A=Reduce('+', 10^(-fastq$X90th.Percentile/10), accumulate = TRUE)))
+  
+  fastq.tmp <- data.frame(fastq.tmp, filename = basename(fileqc))
+  return(fastq.tmp)
+}
+fastTemp <- function(fileqc) {
+  fastq.tmp <- data.frame(qc_read(fileqc, modules = "Per base sequence quality", verbose = TRUE)$per_base_sequence_quality)
+  
+  fastq.tmp <- data.frame(fastq.tmp, filename = basename(fileqc))
+  return(fastq.tmp)
+}
+  
+fqdata <- do.call(rbind, lapply(files, fastqStats))
+fqTmp <- do.call(rbind, lapply(files, fastTemp))
 
 
+fqdata %>% 
+  mutate(group = sapply(strsplit(as.character(filename), "[-]"), `[`, 1)) %>%
+  mutate(filename = sapply(strsplit(as.character(filename), "[_]"), `[`, 1)) %>%
+  ggplot(aes(color = S, group = filename)) + 
+  geom_point(aes(x = R, y = Q), size=1, alpha = 3/5) + 
+  labs(x="Reads position", y="Reads Quality", color = 'Stats') +
+  # scale_color_brewer(palette = 'Dark2') +
+  theme_bw() + facet_grid(group ~ .)
 
+fqdata %>% 
+  as_tibble() %>%
+  filter(S %in% 'Mean' & !is.na(S)) %>%
+  mutate(group = sapply(strsplit(as.character(filename), "[-]"), `[`, 1)) %>%
+  mutate(filename = sapply(strsplit(as.character(filename), "[_]"), `[`, 1)) %>%
+  group_by(group) %>%
+  summarise(mean = mean(log10(A)), 
+            Min = min(log10(A)), 
+            Max = max(log10(A)), 
+            sd = sd(log10(A)), 
+            var = var(log10(A)))
 
+# Error
+fqdata %>% 
+  mutate(group = sapply(strsplit(as.character(filename), "[-]"), `[`, 1)) %>%
+  mutate(filename = sapply(strsplit(as.character(filename), "[_]"), `[`, 1)) %>%
+  filter(S %in% 'Mean' & !is.na(S)) %>%
+  ggplot() +
+  geom_point(aes(x = R, y = log10(A), color = group), alpha = 1/5) +
+  stat_smooth(aes(group = group, x = R, y = log10(A), color = group), se = F) +
+  #coord_cartesian(ylim = c(-3, -1.5)) +
+  labs(x="Reads position", y="EE = sum(10^(-Q/10)) log10",
+       subtitle = 'per-sample Quality fitted to y ~ x  polynomial model')
+#  or
+stats <- c('Mean', 'Lower.Quartile', 'Upper.Quartile')
+errplot <- fqdata %>% 
+  mutate(group = sapply(strsplit(as.character(filename), "[-]"), `[`, 1)) %>%
+  mutate(filename = sapply(strsplit(as.character(filename), "[_]"), `[`, 1)) %>%
+  filter(S %in% stats & !is.na(S)) %>%
+  ggplot(aes(x=R, y = Q)) +
+  stat_summary_2d(aes(z = log10(A))) +
+  geom_line(aes(y = Q, color = S), size = 0.4, linetype = "dashed") + #
+  scale_color_manual(values = c("#e31a1c", "#1f78b4", "#ff7f00")) +
+  viridis::scale_fill_viridis() +
+  theme_classic() +
+  theme(legend.position = "right") +
+  facet_grid(group ~ .) +
+  labs(x="Reads position", y="Reads Quality", color = 'Stats', fill = 'Expected\nError') +
+  guides(fill = guide_colorbar(barheight = unit(4, "in"),
+                               ticks.colour = "black", 
+                               frame.colour = "black",
+                               label.theme = element_text(size = 12)))
 
-
+ggsave(errplot, path = raw_path, 
+       filename = 'qualMaxEEPlot.png', width = 11, height = 7)
 
 # grid search method for optimization in r
 # https://machinelearningmastery.com/tuning-machine-learning-models-using-the-caret-r-package/
