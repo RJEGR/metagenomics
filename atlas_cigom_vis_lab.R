@@ -12,8 +12,7 @@ cleanTax <- c('Arachnida', 'Mammalia', 'Insecta', 'Undetermined_R')
 Level <- 'Family'
 
 # agglomerate families
-tbl_agglom <- function(tax_tbl, count_tbl, Level = names(tax_tbl)[4], 
-                       fkingdom = 'Animals') {
+tbl_agglom <- function(tax_tbl, count_tbl, Level = names(tax_tbl)[4], fkingdom = 'Animals') {
   
   scheck <- identical(rownames(tax_tbl), rownames(count_tbl))
   
@@ -193,7 +192,7 @@ v9_fam %>%
 sam <- names(v9_fam)[-1]
 
 
-
+library(tidyselect)
 apply(v9_fam[-1], 2, pick_top, top = 10, y = v9_fam$Family) %>%
   as_tibble() %>%
   pivot_longer(all_of(sam), names_to = 'id_sample', 
@@ -265,7 +264,7 @@ mset1 <- m[,grep('X04', colnames(m))]
 #           print.plot = F) -> sh
 
 # u ordenar con respecto a todo los datos 
-superheat(apply(m, 2, function(x) x/sum(x) * 100),
+superheat::superheat(apply(m, 2, function(x) x/sum(x) * 100),
           scale = F,
           row.dendrogram = T,
           col.dendrogram = T,
@@ -485,7 +484,7 @@ library(patchwork)
 library(GGally)
 library(viridis)
 
-
+library(GGally)
 m %>% 
   as_tibble(rownames = 'Family') %>%
   mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
@@ -514,13 +513,17 @@ m %>%
                                face = 'bold.italic')) + facet_grid(cruise~.)
 
 # diversity ----
-taxrank <- 'Family'
-top <- 50 # 50
-family <- tax_glom(physeq1, taxrank = taxrank, NArm = FALSE)
 
 physeq %>%
   tax_glom(taxrank = 'Family', NArm = FALSE) %>%
   subset_taxa(Family %in%  rownames(m)) %>%
+  prune_taxa(taxa_sums(.) > 0,.) -> famphy
+
+cleanTax <- c('Undetermined_R', 'Insecta')
+
+physeq %>% 
+  subset_taxa(Kingdom == "Animalia") %>%
+  subset_taxa(!Class %in%  cleanTax) %>%
   prune_taxa(taxa_sums(.) > 0,.) -> famphy
 
 obs_vs_chao <- estimate_richness(famphy) %>%
@@ -528,6 +531,7 @@ obs_vs_chao <- estimate_richness(famphy) %>%
   filter_at(vars(id), all_vars(!grepl('X017_X07',.))) %>%
   mutate(ship = sapply(strsplit(id, "[_]"), `[`, 2),
          cruise = sapply(strsplit(id, "[_]"), `[`, 3))
+
 library(ggpubr)
 
 divplot <- obs_vs_chao %>%
@@ -543,11 +547,14 @@ divplot <- obs_vs_chao %>%
     cor.coef = T) +
   gradient_color(ggsci::pal_gsea("default")(10))
 
-ggsave(divplot, filename = 'diversity.png', 
+divplot <- divplot + theme(legend.position = "top") +
+  guides(color = guide_colorbar(barheight = unit(0.4, "in"),barwidth = unit(10, "in"),ticks.colour = "black", frame.colour = "black",label.theme = element_text(size = 12)))
+
+ggsave(divplot, filename = 'diversity_full.png', 
        dpi = 300, path = path1,
        units = 'in', width = 17, height = 11)
 
-write.table(obs_vs_chao, file = paste0(path1, "/estimated_richness.csv"))
+write.table(obs_vs_chao, file = paste0(path1, "/estimated_richness_ful.csv"))
 
 comp <- list(c('X04','X05'), c('X04','X06'))
 boxp <- obs_vs_chao %>%
@@ -565,7 +572,7 @@ boxp <- obs_vs_chao %>%
   theme(legend.position = "none") 
 
 
-ggsave(boxp, path = path1, filename = 'boxdiversity.png')
+ggsave(boxp, path = path1, filename = 'boxdiversity_full.png')
 
 # maps ----
 path_v9 <- "/Users/cigom/metagenomics/Franccesco/multirun_xixim_18S/"
@@ -596,16 +603,16 @@ gg <- ggplot2::map_data("world", region = "Mexico") %>%
 # 
 library(ggrepel)
 save_map <- gg + 
-  geom_point(data = datmap, 
-         aes(Long, Latitude, 
+  geom_point(data = datmap,
+         aes(Long, Latitude,
              color = Shannon),
-         alpha = 0.7, shape = 20, size =7) +
-  # alpha = 0.7, shape = 15, size =7)
+         alpha = 1, shape = 15, size =7) +
+  # alpha = 1, shape = 15, size =7) 
   # geom_label_repel(data = datmap,
   #                  aes(Long, Latitude,
   #                      color = Shannon,
   #                      label = cruise),
-  #            alpha = 0.7,
+  #            alpha = 1,
   #            fill = 'white',
   #            size = 2.7) +
   gradient_color(ggsci::pal_gsea("default")(10)) +
@@ -614,7 +621,168 @@ save_map <- gg +
   guides(color = guide_colorbar(barheight = unit(0.4, "in"),barwidth = unit(10, "in"),ticks.colour = "black", frame.colour = "black",label.theme = element_text(size = 12))) +
   facet_grid(~ship)
 
-ggsave(save_map, filename = 'map_points.png',  
+ggsave(save_map, filename = 'map_blocks_full.png',  
        dpi = 300, path = path1,
        units = 'in', width = 17, height = 11)
 
+# bubbleplot ----
+
+
+plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum') {
+  
+  if(col_hclust) {
+    round(cor(mset), 2) %>% reorder_cormat() %>% rownames() -> sample_hclust
+    sample_hclust <- sapply(strsplit(sample_hclust, "[_]"), `[`, 2)
+  } else {
+    sample_hclust <- colnames(mset)
+    sample_hclust <- sapply(strsplit(sample_hclust, "[_]"), `[`, 2)
+  }
+  
+  asinTrans <- function(p) { asin(sqrt(p)) }
+  raTrans <- function(x) {x / sum(x) }
+  
+  mset %>% 
+    as_tibble(rownames = 'Family') %>%
+    mutate_at(vars(!all_of(Level)), raTrans) %>%
+    #mutate_at(vars(!all_of(Level)), asinTrans) %>%
+    pivot_longer(cols = !all_of(Level), values_to = "ra", 
+                 names_to = "station") %>%
+    inner_join(tax) %>%
+    mutate(Estacion = sapply(strsplit(station, "[_]"), `[`, 2),
+           Crucero = sapply(strsplit(station, "[_]"), `[`, 1)) %>%
+    mutate(Estacion = factor(Estacion , levels = sample_hclust),
+           Family = factor(Family, levels = tax_hclust),
+           ra = ifelse(ra == 0, NA, ra)) %>%
+    arrange(Order, factor(Family)) -> mset_longer
+  
+  
+  require(RColorBrewer)
+  
+  fnames <- mset_longer %>% distinct_at(colour)
+  colourCount <- mset_longer %>% distinct_at(colour) %>% nrow
+  getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+  fvalues <- setNames(getPalette(colourCount), fnames[[colour]]) 
+  
+  
+  p <-  mset_longer %>%
+    ggplot(aes_string(x = 'Estacion', 
+               y = 'Family', 
+               color = colour)) +
+    geom_point(aes(size = ra )) +
+    scale_size("Abundancia\nRelativa",range = c(0, 10),
+               breaks = c(10, 20, 30, 40, 50, 60),
+               labels = scales::percent_format(scale = 1)) +
+    scale_color_manual(values = fvalues) +
+    labs(x = NULL, y = NULL) +
+    theme_bw(base_size = 12) + 
+    theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                     size = 12, hjust = 1),
+          axis.text.y = element_text(face = 'bold.italic', size = 12)) +
+    guides(color = guide_legend(ncol=1, size = 14, face = "italic"), 
+           size = guide_legend(order = -1, reverse = T))
+  
+  if(facet) {
+    p + facet_grid(Phylum + Class ~ ., 
+                   scales = "free", space = "free" )
+  } else
+    return(p)
+  
+
+  }
+
+p1<- plotBubble(nmset1, colour = 'Phylum')
+p2<- plotBubble(mset2, colour = 'Phylum')
+p3<- plotBubble(mset3, colour = 'Phylum')
+
+
+ggsave(p1, filename = 'bubble_X4.png',  
+       dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+
+ggsave(p2, filename = 'bubble_X5.png',  
+       dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+
+ggsave(p3, filename = 'bubble_X6.png',  
+       dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+
+# barplot ----
+plotbar <- function(mset, col_hclust = FALSE, colour = 'Phylum') {
+  
+  if(col_hclust) {
+    round(cor(mset), 2) %>% reorder_cormat() %>% rownames() -> sample_hclust
+    sample_hclust <- sapply(strsplit(sample_hclust, "[_]"), `[`, 2)
+  } else {
+    sample_hclust <- colnames(mset)
+    sample_hclust <- sapply(strsplit(sample_hclust, "[_]"), `[`, 2)
+  }
+  
+  asinTrans <- function(p) { asin(sqrt(p)) }
+  raTrans <- function(x) {x / sum(x) }
+  
+  mset %>% 
+    as_tibble(rownames = 'Family') %>%
+    mutate_at(vars(!all_of(Level)), raTrans) %>%
+    mutate_at(vars(!all_of(Level)), asinTrans) %>%
+    pivot_longer(cols = !all_of(Level), values_to = "ra", 
+                 names_to = "station") %>%
+    inner_join(tax) %>%
+    mutate(Estacion = sapply(strsplit(station, "[_]"), `[`, 2),
+           Crucero = sapply(strsplit(station, "[_]"), `[`, 1)) %>%
+    mutate(Estacion = factor(Estacion , levels = sample_hclust),
+           Family = factor(Family, levels = tax_hclust)) %>%
+    arrange(Order, factor(Family)) -> mset_longer
+  
+  fnames <- mset_longer %>% distinct_at(colour)
+  colourCount <- mset_longer %>% distinct_at(colour) %>% nrow
+  getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+  fvalues <- setNames(getPalette(colourCount), fnames[[colour]]) 
+  
+  mset_longer %>%
+    ggplot(aes_string(x = 'Estacion', y = 'ra', fill = colour)) +
+    scale_fill_manual(values = fvalues, name = colour) + 
+    geom_bar(stat = "identity", position = "stack", color = 'black') +
+    theme_classic(base_size = 12) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                     size = 12, hjust = 1), 
+                axis.text.y = element_text(size  = 12)) +
+    # scale_y_continuous("Abundancia Relativa",
+    #            labels = scales::percent_format(scale = 1)) +
+    scale_color_manual(values = fvalues) +
+    labs(x = NULL) +
+
+    guides(color = guide_legend(ncol=1))
+  
+  }
+
+p1 <- plotbar(mset1, col_hclust = FALSE, colour = 'Phylum')
+p2 <- plotbar(mset2, col_hclust = FALSE, colour = 'Phylum')
+p3 <- plotbar(mset3, col_hclust = FALSE, colour = 'Phylum')
+
+#
+ggsave(p1, filename = 'bar_X4.png',  
+       dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+ggsave(p2, filename = 'bar_X5.png',  
+       dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+ggsave(p3, filename = 'bar_X6.png',  
+       dpi = 300, path = path1,
+       units = 'in', width = 17, height = 11)
+
+# 
+
+# tratar de manera independiente las familias bundantes
+arthrop <- c('Calanidae', 'Euphausiidae')
+nmset1 <- mset1[!rownames(mset1) %in% arthrop,]
+
+asinTrans <- function(p) { asin(sqrt(p)) }
+raTrans <- function(x) {x / sum(x) }
+
+
+mset1 %>% 
+  as_tibble(rownames = 'Family') %>%
+  mutate_at(vars(!all_of(Level)), raTrans) %>%
+  filter_at(vars(!all_of(Level) < 20))
+  mutate_at(vars(!all_of(Level)), asinTrans)
