@@ -24,7 +24,7 @@ Ranks <- c("Kingdom", "Phylum", "Class", "Order",
            "Family", "Genus", "Species")
 
 # Set paths ----
-p1 <- '/Users/cigom/metagenomics/MG_18S/multirun_xiximis/downstream_X4X5X6X7/'
+path1 <- '/Users/cigom/metagenomics/MG_18S/multirun_xiximis/downstream_X4X5X6X7/'
 
 p2 <- '/Users/cigom/metagenomics/MG_COI/multirun_20200507_COI/'
 
@@ -53,7 +53,7 @@ read_rdp2 <- function(file, header = T) {
 
 # Count data ----
 # 18S
-c1 <- dir(path = p1, 
+c1 <- dir(path = path1, 
           pattern = '*list.shared', 
           full.names = T)
 
@@ -85,7 +85,7 @@ m2 <- data.frame(
 # taxonomy ----
 
 # 18S
-t1 <- dir(path = p1, 
+t1 <- dir(path = path1, 
           pattern = '*cons.taxonomy', 
           full.names = T)
 dim(tax1 <- read_rdp2(t1, header = T))
@@ -174,7 +174,7 @@ library(phyloseq)
 identical(names(ab1),rownames(m1))
 identical(rownames(ab1), rownames(tax1))
 
-physeq1 <- phyloseq(otu_table(ab1, taxa_are_rows = TRUE),
+physeq <- phyloseq(otu_table(ab1, taxa_are_rows = TRUE),
                    tax_table(as(tax1, 'matrix')), 
                     sample_data(m1))
 

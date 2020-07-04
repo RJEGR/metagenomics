@@ -4,6 +4,7 @@ library('FactoInvestigate')
 library("factoextra")
 library("corrplot")
 library(tidyverse)
+library(ggtheme)
 
 color_Crucero <- c('X04'='#00AFBB','X05'= '#E7B800', 'X06'='#FC4E07', 'X07'='red')
 
@@ -193,6 +194,7 @@ sam <- names(v9_fam)[-1]
 
 
 library(tidyselect)
+
 apply(v9_fam[-1], 2, pick_top, top = 10, y = v9_fam$Family) %>%
   as_tibble() %>%
   pivot_longer(all_of(sam), names_to = 'id_sample', 
@@ -225,12 +227,13 @@ tax_sum <- round((rowSums(fam_top[-1]) / total) * 100, 4)
 set.seed(20200511)
 path1 <- '/Users/cigom/metagenomics/MG_18S/multirun_xiximis/downstream_X4X5X6X7/'
 
-png(paste0(path1,"superheat.png"), 
+png(paste0(path1,"superheat_by_fam.png"), 
     height = 11, width = 17, res = 300,
     units = 'in')
 
-apply(m, 2, function(x) x/sum(x) * 100) %>%
-  superheat(
+apply(t(mset1), 2, function(x) x/sum(x) * 100) %>%
+  t() %>%
+  superheat::superheat(
           scale = F,
           row.dendrogram = T,
           clustering.method = 'hierarchical',
@@ -312,6 +315,8 @@ tax1 %>%
 
 plotHeat <- function(mset, facet = TRUE, col_hclust = FALSE) {
   
+  transect_order <- c("Y","A","B","C","D","E","F")
+  
   if(col_hclust) {
     round(cor(mset), 2) %>% reorder_cormat() %>% rownames() -> sample_hclust
     sample_hclust <- sapply(strsplit(sample_hclust, "[_]"), `[`, 2)
@@ -329,25 +334,30 @@ plotHeat <- function(mset, facet = TRUE, col_hclust = FALSE) {
     inner_join(tax) %>%
     mutate(Estacion = sapply(strsplit(station, "[_]"), `[`, 2),
            Crucero = sapply(strsplit(station, "[_]"), `[`, 1)) %>%
-    mutate(Estacion = factor(Estacion , levels = sample_hclust),
-           Family = factor(Family, levels = tax_hclust),
+    mutate(Family = factor(Family, levels = tax_hclust),
            ra = ifelse(ra == 0, NA, ra)) %>%
-    ggplot(aes(x = Estacion, y = Family, fill = ra, color = Crucero))+
-    geom_tile(color = "black") +
-    ggsci::scale_fill_material("indigo",  
+   mutate(transecto = factor(substr(Estacion, 1,1), 
+                             levels = transect_order)) %>%
+   arrange(match(transecto, transect_order), Estacion) %>%
+   mutate(Estacion = factor(Estacion, levels = unique(Estacion))) %>%
+   ggplot(aes(x = Estacion, y = Family, fill = ra, color = Crucero)) +
+   geom_tile(color = "black") +
+   ggsci::scale_fill_material("indigo",  
                                name="Abundancia\nRelativa", na.value = 'white',
                                labels = scales::percent_format(scale = 1)) +
-    labs(x = NULL, y = NULL) +
-    theme_classic() + 
-    theme(axis.text.x = element_text(angle = 45, vjust = 1,
+    labs(x = NULL, y = NULL) + 
+   theme_tufte(base_family='GillSans') +
+   theme(axis.text.x = element_text(angle = 45, vjust = 1,
                                      size = 12, hjust = 1),
-          axis.text.y = element_text(face = 'bold.italic', size = 12)) +
-    guides(fill = guide_colorbar(barheight = unit(9, "in"),
+          axis.text.y = element_text(size = 12)) +
+    
+   guides(fill = guide_colorbar(barheight = unit(9, "in"),
                                  ticks.colour = "black", 
                                  frame.colour = "black",
                                  label.theme = element_text(size = 16))
     ) +
-    theme(
+    
+   theme(
       axis.text.x = element_text(
         angle = 45, hjust = 1, vjust = 1),
       strip.text.y = element_text(
@@ -401,6 +411,7 @@ ggsave(p3nf, filename = 'heatmapnf_X6.png', dpi = 300, path = path1,
        units = 'in', width = 17, height = 11)
 
 library(UpSetR)
+
 m %>% 
   as_tibble(rownames = 'Family') %>%
   mutate_at(vars(!all_of(Level)), function(x) {x / sum(x) * 100 }) %>%
@@ -447,7 +458,7 @@ freqplot <- FreqSamples %>%
                            name="Presencia\nmuestras", na.value = 'grey',
                            labels = scales::percent_format(scale = 1)) +
   labs(x = NULL, y = NULL) +
-  theme_bw() + 
+  theme_tufte(base_family='GillSans') + 
   theme(text = element_text(size = 12),
         axis.line.x = element_blank(),
         axis.title.x = element_blank(),
@@ -628,7 +639,9 @@ ggsave(save_map, filename = 'map_blocks_full.png',
 # bubbleplot ----
 
 
-plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum') {
+plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum', filter_by = '') {
+  
+  transect_order <- c("Y","A","B","C","D","E","F")
   
   if(col_hclust) {
     round(cor(mset), 2) %>% reorder_cormat() %>% rownames() -> sample_hclust
@@ -639,37 +652,52 @@ plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum
   }
   
   asinTrans <- function(p) { asin(sqrt(p)) }
-  raTrans <- function(x) {x / sum(x) }
+  raTrans <- function(x) {x / sum(x) * 100}
+  
+  samples_name <- colnames(mset)
+  
+  join_tax <- function(mset, tax) { mset %>% 
+      as_tibble(rownames = 'Family') %>%
+      inner_join(.,tax)
+    }
   
   mset %>% 
-    as_tibble(rownames = 'Family') %>%
-    mutate_at(vars(!all_of(Level)), raTrans) %>%
+    join_tax(.,tax) %>%
+    arrange_at((vars(all_of(colour)))) %>%
+    filter_at(vars(contains(colour)),
+              any_vars(str_detect(., pattern = filter_by, 
+                                  negate = TRUE))) %>%
+    mutate_at(vars(all_of(samples_name)), raTrans) %>%
     #mutate_at(vars(!all_of(Level)), asinTrans) %>%
-    pivot_longer(cols = !all_of(Level), values_to = "ra", 
-                 names_to = "station") %>%
-    inner_join(tax) %>%
-    mutate(Estacion = sapply(strsplit(station, "[_]"), `[`, 2),
-           Crucero = sapply(strsplit(station, "[_]"), `[`, 1)) %>%
-    mutate(Estacion = factor(Estacion , levels = sample_hclust),
-           Family = factor(Family, levels = tax_hclust),
-           ra = ifelse(ra == 0, NA, ra)) %>%
-    arrange(Order, factor(Family)) -> mset_longer
-  
+    pivot_longer(cols = all_of(samples_name), values_to = "ra", 
+                 names_to = "id") %>%
+    mutate(Estacion = sapply(strsplit(id, "[_]"), `[`, 2),
+           Crucero = sapply(strsplit(id, "[_]"), `[`, 1)) %>%
+    mutate(ra = ifelse(ra == 0, NA, ra)) %>%
+    mutate(transecto = factor(substr(Estacion, 1,1), 
+                              levels = transect_order)) %>%
+    arrange(match(transecto, transect_order), Estacion) %>%
+    mutate(Estacion = factor(Estacion, levels = unique(Estacion))) %>%
+    arrange(desc(match(Phylum, factor(Phylum))), Family) %>%
+    mutate(Family = factor(Family, 
+                           levels = unique(Family))) -> mset_longer
+
+  # # arrange(match(Family, tax_hclust), Order) -> mset_longer
+  # tax_hclust
   
   require(RColorBrewer)
   
-  fnames <- mset_longer %>% distinct_at(colour)
-  colourCount <- mset_longer %>% distinct_at(colour) %>% nrow
+  fnames <- mset %>% join_tax(.,tax) %>% distinct_at(colour)
+  colourCount <- fnames %>% nrow
   getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
   fvalues <- setNames(getPalette(colourCount), fnames[[colour]]) 
   
   
   p <-  mset_longer %>%
-    ggplot(aes_string(x = 'Estacion', 
-               y = 'Family', 
-               color = colour)) +
-    geom_point(aes(size = ra )) +
-    scale_size("Abundancia\nRelativa",range = c(0, 10),
+    ggplot(aes(x = Estacion, 
+               y = Family)) +
+    geom_point(aes_string(size = 'ra', color = colour), fill = 'black') +
+    scale_size("Abundancia\nRelativa",range = c(0, 5),
                breaks = c(10, 20, 30, 40, 50, 60),
                labels = scales::percent_format(scale = 1)) +
     scale_color_manual(values = fvalues) +
@@ -690,9 +718,11 @@ plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum
 
   }
 
-p1<- plotBubble(nmset1, colour = 'Phylum')
-p2<- plotBubble(mset2, colour = 'Phylum')
-p3<- plotBubble(mset3, colour = 'Phylum')
+plotBubble(mset1, colour = 'Phylum', filter_by = 'Arthropoda')
+
+p1 <- plotBubble(mset1, colour = 'Phylum', filter_by = 'Arthropoda')
+p2 <- plotBubble(mset2, colour = 'Phylum')
+p3 <- plotBubble(mset3, colour = 'Phylum')
 
 
 ggsave(p1, filename = 'bubble_X4.png',  
@@ -724,7 +754,7 @@ plotbar <- function(mset, col_hclust = FALSE, colour = 'Phylum') {
   mset %>% 
     as_tibble(rownames = 'Family') %>%
     mutate_at(vars(!all_of(Level)), raTrans) %>%
-    mutate_at(vars(!all_of(Level)), asinTrans) %>%
+    # mutate_at(vars(!all_of(Level)), asinTrans) %>%
     pivot_longer(cols = !all_of(Level), values_to = "ra", 
                  names_to = "station") %>%
     inner_join(tax) %>%
@@ -747,8 +777,8 @@ plotbar <- function(mset, col_hclust = FALSE, colour = 'Phylum') {
     theme(axis.text.x = element_text(angle = 45, vjust = 1,
                                      size = 12, hjust = 1), 
                 axis.text.y = element_text(size  = 12)) +
-    # scale_y_continuous("Abundancia Relativa",
-    #            labels = scales::percent_format(scale = 1)) +
+    scale_y_continuous("Abundancia Relativa",
+               labels = scales::percent_format(scale = 1)) +
     scale_color_manual(values = fvalues) +
     labs(x = NULL) +
 
@@ -775,14 +805,42 @@ ggsave(p3, filename = 'bar_X6.png',
 
 # tratar de manera independiente las familias bundantes
 arthrop <- c('Calanidae', 'Euphausiidae')
-nmset1 <- mset1[!rownames(mset1) %in% arthrop,]
+
 
 asinTrans <- function(p) { asin(sqrt(p)) }
 raTrans <- function(x) {x / sum(x) }
 
+colSums(mset1) / sum(colSums(mset1))
+
+samples_name <- colnames(mset1)
 
 mset1 %>% 
   as_tibble(rownames = 'Family') %>%
-  mutate_at(vars(!all_of(Level)), raTrans) %>%
-  filter_at(vars(!all_of(Level) < 20))
-  mutate_at(vars(!all_of(Level)), asinTrans)
+  inner_join(tax) %>%
+  filter_at(vars(contains(colour)),
+                 any_vars(str_detect(., pattern = filter_by, 
+                                 negate = TRUE))) %>%
+  mutate_at(vars(all_of(samples_name)), raTrans) %>%
+  pivot_longer(cols = all_of(samples_name), values_to = "ra", 
+               names_to = "station") %>%
+  mutate(Estacion = sapply(strsplit(station, "[_]"), `[`, 2),
+         Crucero = sapply(strsplit(station, "[_]"), `[`, 1)) %>%
+  mutate(transecto = factor(substr(Estacion, 1,1), 
+                            levels = transect_order)) %>%
+  arrange(match(transecto, transect_order), Estacion) %>%
+  mutate(Estacion = factor(Estacion))
+  
+
+  arrange(match(transecto, transect_order), Estacion) 
+  arrange(Order, factor(Family))
+
+
+
+  
+# 
+
+
+plotBubble(mset1, colour = 'Phylum', 
+           filter_by = 'Arthropoda')
+
+plotBubble(mset1, colour = 'Phylum', filter_by = 'Chordata')
