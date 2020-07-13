@@ -103,8 +103,11 @@ estimate_richness <- function (feature_tbl, split = TRUE, measures = NULL)
 
 # 
 
-feature_tbl <- read.table(file)
-  
+require(dplyr)
+
+feature_tbl <- read.table(file, header = T) %>%
+  select_if(., is.numeric)
+
 out <- estimate_richness(feature_tbl, measures = measures)
 
 write.table(out, file = paste0(outpath, "/estimated_richness.csv"))
