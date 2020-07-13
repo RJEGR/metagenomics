@@ -305,13 +305,14 @@ cleanClass <- c('Insecta', 'Mammalia', 'Arachnida')
 
 tax1 %>%
   as_tibble() %>%
-  select(Ranks) %>%
+  select_at(all_of(Ranks)) %>%
   filter(Kingdom == 'Animalia') %>%
   filter(!Class %in%  cleanClass) %>%
   filter(Family != 'Undetermined_R') %>%
   group_by(Family) %>%
   distinct_at(all_of(Level), .keep_all = T) %>%
-  select(Phylum,Class,Order,Family) -> tax
+  select_at(all_of(c('Phylum', 'Class', 'Order', 'Family'))) -> tax
+
 
 plotHeat <- function(mset, facet = TRUE, col_hclust = FALSE) {
   
@@ -642,6 +643,11 @@ ggsave(save_map, filename = 'map_blocks_full.png',
 plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum', filter_by = '') {
   
   transect_order <- c("Y","A","B","C","D","E","F")
+  # transect_order <- c("Y","A","B","C","D","E","F")
+  # mutate(transecto = factor(substr(Estacion, 1,1), 
+  #                           levels = transect_order)) %>%
+  #   arrange(match(transecto, transect_order), Estacion) %>%
+  #   mutate(Estacion = factor(Estacion, levels = unique(Estacion)))
   
   if(col_hclust) {
     round(cor(mset), 2) %>% reorder_cormat() %>% rownames() -> sample_hclust
@@ -664,9 +670,9 @@ plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum
   mset %>% 
     join_tax(.,tax) %>%
     arrange_at((vars(all_of(colour)))) %>%
-    filter_at(vars(contains(colour)),
-              any_vars(str_detect(., pattern = filter_by, 
-                                  negate = TRUE))) %>%
+    #filter_at(vars(contains(colour)),
+    #          any_vars(str_detect(., pattern = filter_by, 
+    #                              negate = TRUE))) %>%
     mutate_at(vars(all_of(samples_name)), raTrans) %>%
     #mutate_at(vars(!all_of(Level)), asinTrans) %>%
     pivot_longer(cols = all_of(samples_name), values_to = "ra", 
@@ -677,21 +683,24 @@ plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum
     mutate(transecto = factor(substr(Estacion, 1,1), 
                               levels = transect_order)) %>%
     arrange(match(transecto, transect_order), Estacion) %>%
-    mutate(Estacion = factor(Estacion, levels = unique(Estacion))) %>%
-    arrange(desc(match(Phylum, factor(Phylum))), Family) %>%
+    mutate(Estacion = factor(Estacion, levels = unique(Estacion))) -> mset_longer
+    #arrange(desc(match(Phylum, factor(Phylum))), Family) %>%
+    #mutate(Family = factor(Family, levels = unique(Family))) -> mset_longer
+  # if tax_hclust, use:
+  
+  mset_longer %>%
     mutate(Family = factor(Family, 
-                           levels = unique(Family))) -> mset_longer
-
-  # # arrange(match(Family, tax_hclust), Order) -> mset_longer
+                           levels = tax_hclust)) -> mset_longer
+  
   # tax_hclust
   
   require(RColorBrewer)
   
   fnames <- mset %>% join_tax(.,tax) %>% distinct_at(colour)
   colourCount <- fnames %>% nrow
-  getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+  #getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+  getPalette <- colorRampPalette(ggsci::pal_nejm("default")(colourCount))
   fvalues <- setNames(getPalette(colourCount), fnames[[colour]]) 
-  
   
   p <-  mset_longer %>%
     ggplot(aes(x = Estacion, 
@@ -703,6 +712,7 @@ plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum
     scale_color_manual(values = fvalues) +
     labs(x = NULL, y = NULL) +
     theme_bw(base_size = 12) + 
+    theme_tufte(base_family='GillSans') +
     theme(axis.text.x = element_text(angle = 45, vjust = 1,
                                      size = 12, hjust = 1),
           axis.text.y = element_text(face = 'bold.italic', size = 12)) +
@@ -718,22 +728,22 @@ plotBubble <- function(mset, facet = FALSE, col_hclust = FALSE, colour = 'Phylum
 
   }
 
-plotBubble(mset1, colour = 'Phylum', filter_by = 'Arthropoda')
+plotBubble(mset1, colour = 'Phylum')
 
-p1 <- plotBubble(mset1, colour = 'Phylum', filter_by = 'Arthropoda')
+p1 <- plotBubble(mset1, colour = 'Phylum')
 p2 <- plotBubble(mset2, colour = 'Phylum')
 p3 <- plotBubble(mset3, colour = 'Phylum')
 
 
-ggsave(p1, filename = 'bubble_X4.png',  
+ggsave(p1, filename = 'bubble_X4_new.png',  
        dpi = 300, path = path1,
        units = 'in', width = 17, height = 11)
 
-ggsave(p2, filename = 'bubble_X5.png',  
+ggsave(p2, filename = 'bubble_X5_new.png',  
        dpi = 300, path = path1,
        units = 'in', width = 17, height = 11)
 
-ggsave(p3, filename = 'bubble_X6.png',  
+ggsave(p3, filename = 'bubble_X6_new.png',  
        dpi = 300, path = path1,
        units = 'in', width = 17, height = 11)
 
