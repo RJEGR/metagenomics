@@ -34,6 +34,7 @@ rm(list=ls())
 
 # 0. Load functions ----
 url <- 'https://raw.githubusercontent.com/RJEGR/metagenomics/master/readtx.R'
+
 source(url)
 
 path <- "/Users/cigom/metagenomics/Franccesco/callahan_multirun/outputs/"
@@ -55,9 +56,9 @@ tax_tbl <- list.files(pattern = t_name, full.names = TRUE, path = path)
 # set rank names ----
 
 
-# la intension es tener un formato de rankins segun la base de datos.
+# la intencion es tener un formato de rankins segun la base de datos.
 # y hacer un check dbformat para en base de ello accesar al formato correcto.
-db <- 
+db <- 'midori'
 dbformat <- c("silva", "bold", 'midori')
 dbformat[dbformat %in% db]
 
@@ -233,3 +234,6 @@ aglom_ab(others, rank = 'Genero')
 
 others[others$Genero == 'Acanthometra']
 
+out$others %>% 
+  filter(Reino == 'unknown') %>%
+  select(fsize) %>% sum
