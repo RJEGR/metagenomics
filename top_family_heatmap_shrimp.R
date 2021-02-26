@@ -18,30 +18,90 @@ mtd <- read.csv(mtd_file, sep = "\t") %>%
 
 ranks <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus")
 
-
-# clean taxonomy
-
-obj %>%
-  mutate_at(ranks, 
-            funs(str_replace_all(., c("_[1-9]" = "")))) -> obj
-
 obj %>%
   select_if(is.double) %>%
   names() -> colNames
 
+
+# clean taxonomy
+
+obj %>%
+  mutate_at(ranks, funs(str_replace_all(., c("_[1-9]" = "", ".+_unclassified"=NA_character_, "_"=" ", "Unclassified"=NA_character_, "NA"=NA_character_, "sp."=NA_character_, "Undetermined"=NA_character_, "Unknown"=NA_character_)))) -> obj
+
 agglom_lev <- "Family"
+
+
+obj %>% distinct_at(agglom_lev)
 
 # prepare data to select top
 
 obj %>%
   select_at(vars(c(agglom_lev, colNames))) %>%
   rename("Level" = agglom_lev) %>%
-  # mutate(Level = str_replace_all(Level, c("_[1-9]" = ""))) %>%
-  filter(grepl('ceae', Level)) %>%
+  # filter(grepl('ceae', Level)) %>% # keep all 
   group_by(Level) %>%
   summarise_at(vars(colNames), sum) %>%
   ungroup() -> agg_wide
 
+# test prevalence/ab
+
+prevelancedf = apply(X = agg_wide[-1],
+                     MARGIN = 1,
+                     FUN = function(x){sum(x > 0)})
+
+df <- data.frame(Prevalence = prevelancedf, 
+                TotalAbundance = rowSums(agg_wide[-1]),
+                Family = agg_wide$Level) %>% 
+  left_join(obj %>% select_at(ranks[1:5]) %>% distinct_at(agglom_lev, .keep_all = TRUE)) %>%
+  as_tibble() %>%
+  rename("Level" = agglom_lev) %>%
+  arrange(desc(TotalAbundance))
+
+
+pd <- position_dodge(0.1)
+
+df %>% group_by(Phylum) %>% summarise(n = sum(TotalAbundance), 
+                                      mean = mean(Prevalence),
+                                      N = sum(!is.na(Phylum)),
+                                      sd = sd(Prevalence, na.rm = T),
+                                      se = sd  / sqrt(N)) %>% 
+  arrange(desc(n)) -> summary_prevalence
+
+summary_prevalence %>%
+  ggplot(aes(n, mean)) +
+  # geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1, position = pd) +
+  # geom_line(position = pd) +
+  # geom_point(aes(size = N), alpha = 0.7, position = pd) +
+  scale_x_log10() +
+  ggrepel::geom_text_repel(aes(label = Phylum, color = N), size = 4) +
+  labs(y = "Prevalence (mean)", x = "Total Abundance")
+
+keepPhyla <- summary_prevalence$Phylum[summary_prevalence$n/sum(summary_prevalence$n) >= 0.001]
+
+df %>%
+  # filter(Phylum %in% keepPhyla) %>%
+  mutate(Level = ifelse(is.na(Level), "Incomplete", "Complete")) %>%
+  mutate(Phylum= ifelse(Phylum %in% keepPhyla, Phylum, "Low Taxa")) %>%
+  mutate(Phylum = factor(Phylum, levels = c(keepPhyla, "Low Taxa"))) %>%
+  # mutate(Top = ifelse(Level %in% fam_top$Level, TRUE, FALSE)) %>%
+  mutate(Prevalence = Prevalence/length(colNames)) %>%
+  ggplot(aes(TotalAbundance, Prevalence)) + 
+  geom_point(size = 2, alpha = 0.7, aes(color = Level)) + 
+  geom_hline(yintercept = 0.10, alpha = 0.5, linetype = 2) +
+  scale_x_log10() +
+  labs(y = "Prevalence (Frac. Samples)", x = "Total Abundance (log10)", color = "Lineage") +
+  facet_wrap(~Phylum) +
+  theme_bw(base_size = 17) +
+  theme(
+    legend.position = "top",
+    title = element_text(size = 14),
+    axis.text.x = element_text(
+      angle = 45, hjust = 1, vjust = 1, size = 12)) -> saveP
+
+ggsave(saveP, filename = "Family_prevalence.png", path = dir, 
+       width = 8, height = 8)
+
+save(df, keepPhyla, file = paste0(dir, "ANCOM_BC_inputs.RData"))
 
 pick_top <- function(x, y, top = 10) {
   
@@ -55,13 +115,26 @@ pick_top <- function(x, y, top = 10) {
   return(taxPos)
 }
 
-apply(agg_wide[-1], 2, pick_top, top = 10, 
-      y = agg_wide$Level) %>%
+obj %>%
+  select_at(vars(ranks)) %>%
+  distinct_at(agglom_lev, .keep_all = T) %>%
+  rename("Level" = agglom_lev) %>%
+  left_join(agg_wide) %>%
+  filter(Phylum %in% keepPhyla) %>%
+  select_at(vars(c("Level",colNames))) %>%
+  mutate(Level = ifelse(is.na(Level), "Incomplete", Level)) -> agg_wide_filtered
+
+
+apply(agg_wide_filtered[-1], 2, pick_top, top = 10, 
+      y = agg_wide_filtered$Level) %>%
   as_tibble() %>%
   pivot_longer(all_of(colNames), names_to = 'Index', 
                values_to = "Level") %>%
   distinct(Level) %>%
-  inner_join(agg_wide) -> fam_top
+  inner_join(agg_wide_filtered) -> fam_top
+
+
+
 
 # make tax clustering 
 
@@ -84,6 +157,7 @@ tax_hclust <- sh$order.rows
 tax_hclust <- rownames(m)[tax_hclust]
 
 obj %>%
+  mutate(Family = ifelse(is.na(Family), "Incomplete", Family)) %>%
   select_at(vars(ranks)) %>%
   distinct_at(agglom_lev, .keep_all = T) %>%
   rename("Level" = agglom_lev) %>%
@@ -95,7 +169,7 @@ obj %>%
 
 # sanity check ----
 
-dataHeat %>% group_by(Tissue, Index) %>% summarise(sum(ra))
+
 
 # set left-panel (Phylum) ordering 
 dataHeat %>% group_by(Phylum) %>% summarise(t = sum(ra)) %>% arrange(desc(t)) %>% pull(Phylum) -> PhylumLevel
@@ -144,7 +218,7 @@ dataHeat %>%
 ggsave(heatPlot, filename = "heatmap.png", path = dir, 
        width = 22, height = 16)
 
-save(obj, mtd, colNames, 
+save(obj, mtd, colNames, keepPhyla,
      tax_hclust, ranks, file = paste0(dir, "objects.RData"))
 
 # test features diversity ----
