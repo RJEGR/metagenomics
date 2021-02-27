@@ -132,18 +132,24 @@ out2 <- ANCOMBC::ancombc(phyloseq = ancombc_data2, formula = formula,
 out_df(out2) %>%
   filter(logFC != 0) %>% arrange(desc(logFC)) %>% 
   mutate(group = str_replace_all(group, c("Tissue" = ""))) %>%
-  mutate(wrap = paste0(group, "-Midgut")) %>%
+  mutate(wrap = paste0("Midgut-", group)) %>%
   mutate(group = ifelse(logFC > 0, "g1", "g2")) -> df_fig_F_M
 
 table(df_fig_F_M$wrap)
 table(df_fig$wrap)
 # Data are represented by effect size (log fold change) and 95% confidence interval bars (two-sided; Bonferroni adjusted) derived from the ANCOM-BC model.\nAll effect sizes with adjusted p<0.05 are indicated:
+write_tsv(rbind(df_fig_F_M, df_fig), file = paste0(dir, "ANCOMBC_res.tsv"))
 
 rbind(df_fig_F_M, df_fig) %>%
+  left_join(dataHeat %>% select_at(c("taxon_id", ranks[1:4])) %>% distinct(.keep_all = T)) %>%
+  mutate(Phylum = factor(Phylum,  levels = labels)) %>%
   ggplot(data = ., 
            aes(x = taxon_id, y = logFC, fill = group)) + 
   geom_bar(stat = "identity", width = 0.7, 
            position = position_dodge(width = 0.4)) +
+  # facet_wrap(~wrap) +
+  ggh4x::facet_nested(Phylum  ~wrap, scales = "free", space = "free", switch = "y") +
+  coord_flip() +
   geom_errorbar(aes(ymin = logFC - SE, 
                     ymax = logFC + SE), width = 0.2,
                 position = position_dodge(0.05), color = "black") + 
@@ -153,20 +159,20 @@ rbind(df_fig_F_M, df_fig) %>%
   # scale_fill_discrete("Intercept") +
   # ggsci::scale_fill_gsea(name = "P value (adjusted) ") +
   guides(color = "none") +
-  labs(x = NULL, y = "Log fold change", 
-       title = "Analysis composition of microbiomes w/ \nbias correction (ANCOM-BC)\n",
-       caption = "\n *significant at 5% level of significance;\n**significant at 1% level of significance;\n***significant at 0.1% level of significance") + 
+  labs(x = NULL, y = "Log fold change") +
+       # title = "Analysis composition of microbiomes w/ \nbias correction (ANCOM-BC)\n",
+       # caption = "\n *significant at 5% level of significance;\n**significant at 1% level of significance;\n***significant at 0.1% level of significance") + 
   theme_classic(base_size = 16, base_family = "GillSans") + 
-  facet_wrap(~wrap) +
-  coord_flip() +
   geom_abline(slope = 0, intercept = 0, linetype="dashed", alpha=0.5) +
   theme(legend.position = "none",
         plot.title = element_text(hjust = 0),
         plot.caption = element_text(hjust = 0),
         panel.grid.minor.y = element_blank(),
+        strip.background.y = element_blank(),
+        axis.text.y.right = element_text(angle = 0, hjust = 1, vjust = 0, size = 6),
         axis.text.x = element_text(angle = 0, hjust = 1)) -> p
 
-ggsave(p, filename = "ANCOMBC_all_contrast.png", path = dir, 
+ggsave(p, filename = "ANCOMBC_all_contrast2.png", path = dir, 
        width = 8, height = 8)
 
 
@@ -269,11 +275,11 @@ dataViz %>%
   ggh4x::facet_nested(Phylum  ~., scales = "free", space = "free", switch = "y") +
   labs(x = NULL, y = NULL) +
   coord_flip() +
-  theme_classic(base_size = 18, base_family = "GillSans") +
+  theme_classic(base_size = 16, base_family = "GillSans") +
   theme(strip.background.y = element_blank(),
-        strip.text = element_text(margin = margin(1, 1, 1, 1)),
-        axis.text.y.left = element_text(angle = 0, hjust = 1, vjust = 1, size = 18),
-        axis.text.y.right = element_text(angle = 0, hjust = 1, vjust = 1, size = 12)) -> p2
+        # strip.text = element_text(margin = margin(1, 1, 1, 1)),
+        axis.text.y.left = element_text(angle = 0, hjust = 1, vjust = 0, size = 16),
+        axis.text.y.right = element_text(angle = 0, hjust = 1, vjust = 0, size = 6)) -> p2
 
 
 ggsave(p2, filename = "bar_ANCOM_list.png", path = dir, 

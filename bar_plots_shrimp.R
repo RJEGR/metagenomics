@@ -7,13 +7,25 @@ mtd_file <- list.files(path = dir, pattern = "CIAD_MappingFile.txt$", full.names
 
 library(readxl)
 library(tidyverse)
-
+library(ggsci)
 
 obj <- read_xlsx(files[2])
 
 mtd <- read.csv(mtd_file, sep = "\t") %>% 
   select(Sample_IDs, Tissue, Time) %>%
   rename(Index = Sample_IDs)
+
+sam <- data.frame(mtd, row.names = mtd$Index) %>% 
+  arrange(match(Index, colNames)) %>% mutate_if(is.character, as.factor)
+
+# foregut (stomach), midgut (hepatopancreas), and hindgut (intestine), 
+
+sam %>% mutate(Tissue = recode_factor(Tissue, Intestine = "Hindgut", Hepatopancreas = "Midgut", Stomach = "Foregut")) -> sam
+
+TimeLev <- c("Farm", 0,20,40,60,80)
+
+sam %>% mutate(Time = str_replace_all(Time, c("Day" = ""))) %>%
+  mutate(Time = factor(Time, levels = TimeLev)) -> mtd
 
 ranks <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus")
 
@@ -108,6 +120,7 @@ facet_bar <- function(obj, colNames, agglom_lev = "Phylum", low_ab = 1) {
   labels[length(labels)] <- "Low abundance"
   
   dataViz %>%
+    drop_na()%>%
     ggplot(aes(x = Time, y = ra, fill = Level)) +
     geom_col() + # scale_x_reverse() +
     coord_flip() +
@@ -122,9 +135,9 @@ PPhylum <- facet_bar(obj, colNames, "Phylum")
 PClass <- facet_bar(obj, colNames, "Class", low_ab = 1)
 POrder <- facet_bar(obj, colNames, "Order", low_ab = 2)
 
-ggsave(PPhylum, filename = "Bar_Phylum.png", path = dir, 
+ggsave(PPhylum, filename = "Bar_Phylum_time.png", path = dir, 
        width = 10, height = 8)
-ggsave(PClass, filename = "Bar_Class.png", path = dir, 
+ggsave(PClass, filename = "Bar_Class_time.png", path = dir, 
        width = 10, height = 8)
-ggsave(POrder, filename = "Bar_Order.png", path = dir, 
+ggsave(POrder, filename = "Bar_Order_time.png", path = dir, 
        width = 10, height = 8)
