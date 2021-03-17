@@ -11,7 +11,7 @@ obj %>%
   pivot_longer(cols = ranks) %>% fill(value) %>%
   pivot_wider(names_from = name) %>%
   select(-id) %>%
-  left_join(sam) %>%
+  left_join(mtd) %>%
   group_by(Tissue,Family) %>%
   summarise(ab = sum(ab)) %>% arrange(desc(ab)) %>%
   ungroup() %>%

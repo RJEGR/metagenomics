@@ -54,11 +54,13 @@ identical(rownames(dat), rownames(tax))
 # and parse
 phyloseq = phyloseq(otu_table(dat, taxa_are_rows = TRUE), 
                     tax_table(as(tax, 'matrix')), 
-                    sample_data(sam)) %>%
+                    sample_data(sam)) 
+  # transform_sample_counts(function(x) sqrt(x / sum(x)))
+saveRDS(phyloseq, file = paste0(dir, 'phyloseq_ancom.rds'))
+
+phyloseq <- phyloseq %>%
   subset_taxa(Family %in% intersected_taxa) %>%
   prune_taxa(taxa_sums(.) > 0, .)
-  # transform_sample_counts(function(x) sqrt(x / sum(x)))
-
 
 ranks
 
